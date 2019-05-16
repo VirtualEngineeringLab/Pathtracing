@@ -302,6 +302,7 @@ public class RayTracingMaster : MonoBehaviour
     private float thisCameraFOV;
     private bool test = false;
     public Texture2D tex;
+    private Material shiftMat;
 
     private void Render(RenderTexture destination)
     {
@@ -316,9 +317,10 @@ public class RayTracingMaster : MonoBehaviour
 
         // Blit the result texture to the screen
         if (_addMaterial == null)
-            _addMaterial = new Material(Shader.Find("Hidden/AddShader"));
+            _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
+        if (shiftMat == null)
+            shiftMat = new Material(Shader.Find("Hidden/AddShader"));
         _addMaterial.SetFloat("_Sample", _currentSample);
-
 
         //    Graphics.Blit(_target, test);
         //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
@@ -330,8 +332,43 @@ public class RayTracingMaster : MonoBehaviour
         //_converged = new RenderTexture(Screen.width, Screen.height, 0,
         //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         //_converged = (RenderTexture)temp.mainTexture;
+        float xOff = -(lastCameraRot.y - thisCameraRot.y);
+        if (lastCameraRot.y - thisCameraRot.y>180)
+        {
+            xOff = -(lastCameraRot.y - thisCameraRot.y)-360;
+        }
+        else if (lastCameraRot.y - thisCameraRot.y < -180)
+        {
+            xOff = -(lastCameraRot.y - thisCameraRot.y)+360;
+        }
 
-        Graphics.BlitMultiTap(_target, _converged, _addMaterial, new Vector2(0.1f,0.1f));//, new Vector2(-((lastCameraRot.y - thisCameraRot.y) / thisCameraFOV) * Screen.height, ((lastCameraRot.x - thisCameraRot.x) / thisCameraFOV) * Screen.width));
+        float yOff = (lastCameraRot.x - thisCameraRot.x);
+        if (lastCameraRot.x - thisCameraRot.x > 180)
+        {
+            yOff = (lastCameraRot.x - thisCameraRot.x) - 360;
+        }
+        else if (lastCameraRot.x - thisCameraRot.x < -180)
+        {
+            yOff = (lastCameraRot.x - thisCameraRot.x) + 360;
+        }
+
+        shiftMat.SetFloat("_xOffset", xOff / thisCameraFOV);
+        shiftMat.SetFloat("_yOffset", yOff / thisCameraFOV);
+
+        RenderTexture temp = new RenderTexture(Screen.width, Screen.height, 0,
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        temp.enableRandomWrite = true;
+        temp.Create();
+        Graphics.CopyTexture(_converged, temp);
+        _converged.Release();
+        _converged = new RenderTexture(Screen.width, Screen.height, 0,
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        _converged.enableRandomWrite = true;
+        _converged.Create();
+
+        Graphics.Blit(temp, _converged, shiftMat);
+        //Graphics.Blit(_converged, _converged, _addMaterial);
+        Graphics.Blit(_target, _converged, _addMaterial);
 
         if (!test)
         {
@@ -340,8 +377,7 @@ public class RayTracingMaster : MonoBehaviour
             //System.IO.File.WriteAllBytes(Application.persistentDataPath + "/p.png", bytes);
         }
 
-        //_addMaterial.SetFloat("_xOffset", (lastCameraRot.y - thisCameraRot.y) / thisCameraFOV);
-        //_addMaterial.SetFloat("_yOffset", (lastCameraRot.x - thisCameraRot.x) / thisCameraFOV);
+        
         //, Vector2.one, new Vector2((thisCameraRot.y - lastCameraRot.y)*thisCameraFOV/Screen.height, (thisCameraRot.x-lastCameraRot.x)*thisCameraFOV/ Screen.width));
         Graphics.Blit(_converged, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
         if (_currentSample < sampleFrames)
