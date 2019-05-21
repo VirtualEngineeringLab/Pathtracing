@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.VR;
+using UnityEngine.XR;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -18,6 +20,7 @@ public class RayTracingMaster : MonoBehaviour
     private float _lastFieldOfView;
     private RenderTexture _target;
     private RenderTexture _converged;
+    [SerializeField]
     private Material _addMaterial;
     private uint _currentSample = 0;
     private ComputeBuffer _sphereBuffer;
@@ -33,6 +36,12 @@ public class RayTracingMaster : MonoBehaviour
 
     [SerializeField]
     private uint sampleFrames = 2;
+
+    [SerializeField]
+    private float renderScale = 1f;
+
+    private int RenderHight;
+    private int RenderWidth;
 
     struct MeshObject
     {
@@ -61,7 +70,11 @@ public class RayTracingMaster : MonoBehaviour
     }
 
     private void OnEnable()
-    {
+    {       
+
+        print(Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale) +" " + Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale));
+        print(Mathf.RoundToInt(Screen.height * renderScale) +" " + Mathf.RoundToInt(Screen.width * renderScale));
+
         _currentSample = 0;
         SetUpScene();
     }
@@ -73,7 +86,7 @@ public class RayTracingMaster : MonoBehaviour
         _vertexBuffer?.Release();
         _indexBuffer?.Release();
     }
-
+  
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.F12))
@@ -272,7 +285,8 @@ public class RayTracingMaster : MonoBehaviour
 
     private void InitRenderTexture()
     {
-        if (_target == null || _target.width != Screen.width || _target.height != Screen.height)
+        GetRenderScale();
+        if (_target == null || _target.width != RenderWidth || _target.height != RenderHight)
         {
             // Release render texture if we already have one
             if (_target != null)
@@ -282,11 +296,11 @@ public class RayTracingMaster : MonoBehaviour
             }
 
             // Get a render target for Ray Tracing
-            _target = new RenderTexture(Screen.width, Screen.height, 0,
+            _target = new RenderTexture(RenderWidth, RenderHight, 0,
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _target.enableRandomWrite = true;
             _target.Create();
-            _converged = new RenderTexture(Screen.width, Screen.height, 0,
+            _converged = new RenderTexture(RenderWidth, RenderHight, 0,
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
@@ -296,31 +310,45 @@ public class RayTracingMaster : MonoBehaviour
         }
 
     }
+    private void GetRenderScale()
+    {
+        if (XRSettings.enabled)
+        {
+            RenderHight = Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale);
+            RenderWidth = Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale);
+        }
+        else
+        {
+            RenderHight = Mathf.RoundToInt(Screen.height * renderScale);
+            RenderWidth = Mathf.RoundToInt(Screen.width * renderScale);
+        }
+    }
+
 
     private Vector3 lastCameraRot;
     private Vector3 thisCameraRot;
     private float thisCameraFOV;
-    private bool test = false;
-    public Texture2D tex;
+    [SerializeField]
     private Material shiftMat;
 
-    private void Render(RenderTexture destination)
+    private void Render(RenderTexture source, RenderTexture destination)
     {
         // Make sure we have a current render target
         InitRenderTexture();
 
         // Set the target and dispatch the compute shader
         RayTracingShader.SetTexture(0, "Result", _target);
-        int threadGroupsX = Mathf.CeilToInt(Screen.width / 8.0f);
-        int threadGroupsY = Mathf.CeilToInt(Screen.height / 8.0f);
+        int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
+        int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
         // Blit the result texture to the screen
-        if (_addMaterial == null)
-            _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
-        if (shiftMat == null)
-            shiftMat = new Material(Shader.Find("Hidden/AddShader"));
-        _addMaterial.SetFloat("_Sample", _currentSample);
+        //if (_addMaterial == null)
+        //    _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
+        
+        //_addMaterial.SetFloat("_Sample", _currentSample);  
+  
+
 
         //    Graphics.Blit(_target, test);
         //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
@@ -329,76 +357,57 @@ public class RayTracingMaster : MonoBehaviour
         //temp.mainTexture = toTexture2D(_converged);
         //temp.mainTextureOffset = new Vector2(1,1);
         //_converged.Release();
-        //_converged = new RenderTexture(Screen.width, Screen.height, 0,
+        //_converged = new RenderTexture(Mathf.RoundToInt(Screen.width*renderScale), Mathf.RoundToInt(Screen.height*renderScale), 0,
         //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         //_converged = (RenderTexture)temp.mainTexture;
-        float xOff = -(lastCameraRot.y - thisCameraRot.y);
-        if (lastCameraRot.y - thisCameraRot.y>180)
-        {
-            xOff = -(lastCameraRot.y - thisCameraRot.y)-360;
-        }
-        else if (lastCameraRot.y - thisCameraRot.y < -180)
-        {
-            xOff = -(lastCameraRot.y - thisCameraRot.y)+360;
-        }
 
-        float yOff = (lastCameraRot.x - thisCameraRot.x);
-        if (lastCameraRot.x - thisCameraRot.x > 180)
-        {
-            yOff = (lastCameraRot.x - thisCameraRot.x) - 360;
-        }
-        else if (lastCameraRot.x - thisCameraRot.x < -180)
-        {
-            yOff = (lastCameraRot.x - thisCameraRot.x) + 360;
-        }
+        //if (shiftMat == null)
+        //    shiftMat = new Material(Shader.Find("Hidden/AddShader"));
 
-        shiftMat.SetFloat("_xOffset", xOff / thisCameraFOV);
-        shiftMat.SetFloat("_yOffset", yOff / thisCameraFOV);
+        //shiftMat.SetFloat("_Sample", _currentSample);
 
-        RenderTexture temp = new RenderTexture(Screen.width, Screen.height, 0,
-                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        temp.enableRandomWrite = true;
-        temp.Create();
-        Graphics.CopyTexture(_converged, temp);
-        _converged.Release();
-        _converged = new RenderTexture(Screen.width, Screen.height, 0,
-                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        _converged.enableRandomWrite = true;
-        _converged.Create();
+        //shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y)  / (thisCameraFOV*Camera.main.aspect));
+        //shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x)/ thisCameraFOV);
 
-        Graphics.Blit(temp, _converged, shiftMat);
-        //Graphics.Blit(_converged, _converged, _addMaterial);
-        Graphics.Blit(_target, _converged, _addMaterial);
+        //Texture2D temp = toTexture2D(_converged);
+        
+        //_converged.Release();
+        //_converged = new RenderTexture(RenderWidth, RenderHight, 0,
+        //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        //_converged.enableRandomWrite = true;
+        //_converged.Create();
 
-        if (!test)
-        {
-            tex = toTexture2D(_converged);            
+        //Graphics.Blit(temp, _converged, shiftMat);
 
-            //System.IO.File.WriteAllBytes(Application.persistentDataPath + "/p.png", bytes);
-        }
-
+        //Destroy(temp);
+        
+        //Graphics.Blit(_target, _converged, _addMaterial);
+        //Graphics.Blit(source, _converged, _addMaterial);
+        //Graphics.Blit(_converged, _target, _addMaterial);
         
         //, Vector2.one, new Vector2((thisCameraRot.y - lastCameraRot.y)*thisCameraFOV/Screen.height, (thisCameraRot.x-lastCameraRot.x)*thisCameraFOV/ Screen.width));
-        Graphics.Blit(_converged, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
+        Graphics.Blit(_target, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
         if (_currentSample < sampleFrames)
             _currentSample++;
     }
 
     Texture2D toTexture2D(RenderTexture rTex)
     {
-        Texture2D tex = new Texture2D(512, 512, TextureFormat.RGB24, false);
+        Texture2D tex = new Texture2D(RenderWidth, RenderHight, TextureFormat.RGB24, false);
         RenderTexture.active = rTex;
         tex.ReadPixels(new Rect(0, 0, rTex.width, rTex.height), 0, 0);
+        RenderTexture.active = _target;
         tex.Apply();
         return tex;
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
-    {        
-        thisCameraRot = Camera.main.transform.eulerAngles;
+    {
+        //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
+        thisCameraRot = _camera.transform.rotation.eulerAngles;
         RebuildMeshObjectBuffers();
         SetShaderParameters();
-        Render(destination);
+        Render(source, destination);
         lastCameraRot = thisCameraRot;
     }
 }
