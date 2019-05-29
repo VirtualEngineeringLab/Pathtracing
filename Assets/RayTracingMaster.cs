@@ -333,6 +333,9 @@ public class RayTracingMaster : MonoBehaviour
     [SerializeField]
     private Material shiftMat;
 
+    RenderTexture temp;
+    RenderTexture temp2;
+
     private void Render(RenderTexture source, RenderTexture destination)
     {
         // Make sure we have a current render target
@@ -374,7 +377,13 @@ public class RayTracingMaster : MonoBehaviour
         //CommandBuffer cb = new CommandBuffer();
         //cb.CopyTexture(_converged, temp);
 
-        RenderTexture temp = new RenderTexture(RenderWidth, RenderHight, 0,  RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        if (temp == null || temp2 == null)
+        {
+            Destroy(temp);
+            Destroy(temp2);
+            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        }
 
         //Graphics.CopyTexture(_converged, temp);
         //temp = _converged;
@@ -390,9 +399,11 @@ public class RayTracingMaster : MonoBehaviour
         //Destroy(temp);
 
         Graphics.Blit(_target, _converged);
-        //Graphics.Blit(Detail, temp, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
+        Graphics.Blit(Detail, temp, shiftMat);
+        Graphics.CopyTexture(temp, 0,0, (int)(temp.width/4),(int)(temp.height/4), (int)(temp.width / 2), (int)(temp.height / 2), temp2,0,0, (int)(temp2.width / 4), (int)(temp2.height / 4));
+        //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
         //Graphics.Blit(_target, _converged, shiftMat);
-        //Graphics.Blit(temp, _converged, _addMaterial);
+        Graphics.Blit(temp2, _converged, _addMaterial);
         
         //Graphics.Blit(_converged, _target, _addMaterial);
 
