@@ -39,8 +39,8 @@
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
-				o.uv.x = v.uv.x + _xOffset;
-				o.uv.y = v.uv.y + _yOffset;
+				o.uv.x = v.uv.x*2 -0.5f;
+				o.uv.y = v.uv.y*2 -0.5f;
 				return o;
 			}
 			
@@ -49,7 +49,7 @@
 
 			float4 frag (v2f i) : SV_Target
 			{
-				return float4(tex2D(_MainTex, i.uv).rgb, 1.0f );
+				return float4(tex2D(_MainTex, i.uv).rgb, 0.5f );
 			}
 			ENDCG
 		}
