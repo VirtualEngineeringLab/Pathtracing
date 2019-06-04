@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.VR;
@@ -35,6 +36,8 @@ public class RayTracingMaster : MonoBehaviour
     private ComputeBuffer _vertexBuffer;
     private ComputeBuffer _indexBuffer;
 
+    public Transform obj;
+
     [SerializeField]
     private uint sampleFrames = 2;
 
@@ -63,6 +66,9 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Awake()
     {
+        //LightmapEditorSettings.denoiserTypeAO = LightmapEditorSettings.DenoiserType.Optix;
+        //LightmapEditorSettings.denoiserTypeDirect = LightmapEditorSettings.DenoiserType.Optix;
+        //LightmapEditorSettings.denoiserTypeIndirect = LightmapEditorSettings.DenoiserType.Optix;
         _camera = GetComponent<Camera>();
 
         _transformsToWatch.Add(transform);
@@ -399,11 +405,11 @@ public class RayTracingMaster : MonoBehaviour
         //Destroy(temp);
 
         Graphics.Blit(_target, _converged);
-        Graphics.Blit(Detail, temp, shiftMat);
-        Graphics.CopyTexture(temp, 0,0, (int)(temp.width/4),(int)(temp.height/4), (int)(temp.width / 2), (int)(temp.height / 2), temp2,0,0, (int)(temp2.width / 4), (int)(temp2.height / 4));
+        //Graphics.Blit(Detail, temp, shiftMat);
+        //Graphics.CopyTexture(temp, 0,0, (int)(temp.width/3),(int)(temp.height/3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0,0, (int)(_converged.width / 3), (int)(_converged.height / 3));
         //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
         //Graphics.Blit(_target, _converged, shiftMat);
-        Graphics.Blit(temp2, _converged, _addMaterial);
+        //Graphics.Blit(temp2, _converged, _addMaterial);
         
         //Graphics.Blit(_converged, _target, _addMaterial);
 

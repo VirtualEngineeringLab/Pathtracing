@@ -189,46 +189,46 @@ public class RayTracingSlave : MonoBehaviour
 
     private void RebuildMeshObjectBuffers()
     {
-        if (!_meshObjectsNeedRebuilding)
-        {
-            return;
-        }
+        //if (!_meshObjectsNeedRebuilding)
+        //{
+        //    return;
+        //}
 
-        _meshObjectsNeedRebuilding = false;
-        _currentSample = sampleFrames;
+        //_meshObjectsNeedRebuilding = false;
+        //_currentSample = sampleFrames;
 
-        // Clear all lists
-        _meshObjects.Clear();
-        _vertices.Clear();
-        _indices.Clear();
+        //// Clear all lists
+        //_meshObjects.Clear();
+        //_vertices.Clear();
+        //_indices.Clear();
 
-        // Loop over all objects and gather their data
-        foreach (RayTracingObject obj in _rayTracingObjects)
-        {
-            Mesh mesh = obj.GetComponent<MeshFilter>().sharedMesh;
+        //// Loop over all objects and gather their data
+        //foreach (RayTracingObject obj in _rayTracingObjects)
+        //{
+        //    Mesh mesh = obj.GetComponent<MeshFilter>().sharedMesh;
 
-            // Add vertex data
-            int firstVertex = _vertices.Count;
-            _vertices.AddRange(mesh.vertices);
+        //    // Add vertex data
+        //    int firstVertex = _vertices.Count;
+        //    _vertices.AddRange(mesh.vertices);
 
-            // Add index data - if the vertex buffer wasn't empty before, the
-            // indices need to be offset
-            int firstIndex = _indices.Count;
-            var indices = mesh.GetIndices(0);
-            _indices.AddRange(indices.Select(index => index + firstVertex));
+        //    // Add index data - if the vertex buffer wasn't empty before, the
+        //    // indices need to be offset
+        //    int firstIndex = _indices.Count;
+        //    var indices = mesh.GetIndices(0);
+        //    _indices.AddRange(indices.Select(index => index + firstVertex));
 
-            // Add the object itself
-            _meshObjects.Add(new MeshObject()
-            {
-                localToWorldMatrix = obj.transform.localToWorldMatrix,
-                indices_offset = firstIndex,
-                indices_count = indices.Length
-            });
-        }
+        //    // Add the object itself
+        //    _meshObjects.Add(new MeshObject()
+        //    {
+        //        localToWorldMatrix = obj.transform.localToWorldMatrix,
+        //        indices_offset = firstIndex,
+        //        indices_count = indices.Length
+        //    });
+        //}
 
-        CreateComputeBuffer(ref _meshObjectBuffer, _meshObjects, 72);
-        CreateComputeBuffer(ref _vertexBuffer, _vertices, 12);
-        CreateComputeBuffer(ref _indexBuffer, _indices, 4);
+        //CreateComputeBuffer(ref _meshObjectBuffer, _meshObjects, 72);
+        //CreateComputeBuffer(ref _vertexBuffer, _vertices, 12);
+        //CreateComputeBuffer(ref _indexBuffer, _indices, 4);
     }
 
     private static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
@@ -279,9 +279,9 @@ public class RayTracingSlave : MonoBehaviour
         RayTracingShader.SetVector("_DirectionalLight", new Vector4(l.x, l.y, l.z, DirectionalLight.intensity));
 
         SetComputeBuffer("_Spheres", _sphereBuffer);
-        SetComputeBuffer("_MeshObjects", _meshObjectBuffer);
-        SetComputeBuffer("_Vertices", _vertexBuffer);
-        SetComputeBuffer("_Indices", _indexBuffer);
+        //SetComputeBuffer("_MeshObjects", _meshObjectBuffer);
+        //SetComputeBuffer("_Vertices", _vertexBuffer);
+        //SetComputeBuffer("_Indices", _indexBuffer);
     }
 
     private void InitRenderTexture()
@@ -332,6 +332,8 @@ public class RayTracingSlave : MonoBehaviour
     [SerializeField]
     private Material shiftMat;
 
+
+
     private void Render(RenderTexture source, RenderTexture destination)
     {
         // Make sure we have a current render target
@@ -343,82 +345,20 @@ public class RayTracingSlave : MonoBehaviour
         int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
-        // Blit the result texture to the screen
-        //if (_addMaterial == null)
-        //    _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
         
-        //_addMaterial.SetFloat("_Sample", _currentSample);
-        //Texture2D t = new Texture2D(
-        //         _target.width,
-        //         _target.height,
-        //         TextureFormat.RGBAFloat,
-        //         false, false);
-        //Graphics.CopyTexture(_target, t);
-        //t.wrapMode = TextureWrapMode.Clamp;
-        //t.filterMode = FilterMode.Point;
-        //var borderColor = Color.clear;
-
-        //for (int i = 0; i < t.height; i++)
-        //{
-        //    t.SetPixel(0, i, Color.clear);
-        //    t.SetPixel(t.height - 1, i, Color.clear);
-        //}
-
-
-        //for (int i = 0; i < t.width; i++)
-        //{
-        //    t.SetPixel(i, 0, Color.clear);
-        //    t.SetPixel(i, t.width - 1, Color.clear);
-        //}
-
         //t.Apply();
         //i.Apply();
         //temp.Resize(GetComponentInParent<RayTracingMaster>().RenderWidth, GetComponentInParent<RayTracingMaster>().RenderHight)
         GetComponentInParent<RayTracingMaster>().Detail = _target;
-        //    Graphics.Blit(_target, test);
-        //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
+ 
 
-        //Material temp = new Material(Shader.Find("Standard"));
-        //temp.mainTexture = toTexture2D(_converged);
-        //temp.mainTextureOffset = new Vector2(1,1);
-        //_converged.Release();
-        //_converged = new RenderTexture(Mathf.RoundToInt(Screen.width*renderScale), Mathf.RoundToInt(Screen.height*renderScale), 0,
-        //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        //_converged = (RenderTexture)temp.mainTexture;
-
-        //if (shiftMat == null)
-        //    shiftMat = new Material(Shader.Find("Hidden/AddShader"));
-
-        //shiftMat.SetFloat("_Sample", _currentSample);
-
-        //shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y)  / (thisCameraFOV*Camera.main.aspect));
-        //shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x)/ thisCameraFOV);
-
-        //Texture2D temp = new Texture2D(RenderWidth, RenderHight);
-        //CommandBuffer cb = new CommandBuffer();
-        //cb.CopyTexture(_converged, temp);
-
-        //RenderTexture temp = new RenderTexture(RenderWidth, RenderHight, 0,  RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-
-        //Graphics.CopyTexture(_converged, temp);
-        ////temp = _converged;
-
-        ////_converged.Release();
-        ////_converged = new RenderTexture(RenderWidth, RenderHight, 0,
-        ////        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        ////_converged.enableRandomWrite = true;
-        ////_converged.Create();        
-
-        //Graphics.Blit(temp, _converged, shiftMat);
-
-        //Destroy(temp);
 
         //Graphics.Blit(_target, _converged, _addMaterial);
         ////Graphics.Blit(source, _converged, _addMaterial);
         ////Graphics.Blit(_converged, _target, _addMaterial);
 
         ////, Vector2.one, new Vector2((thisCameraRot.y - lastCameraRot.y)*thisCameraFOV/Screen.height, (thisCameraRot.x-lastCameraRot.x)*thisCameraFOV/ Screen.width));
-        //Graphics.Blit(_converged, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
+        //Graphics.Blit(_target, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
         //if (_currentSample < sampleFrames)
         //    _currentSample++;
     }
