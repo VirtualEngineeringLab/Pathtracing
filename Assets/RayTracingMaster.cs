@@ -39,7 +39,7 @@ public class RayTracingMaster : MonoBehaviour
     public Transform obj;
 
     [SerializeField]
-    private uint sampleFrames = 2;
+    private uint sampleFrames = 0;
 
     [SerializeField]
     private float renderScale = 1f;
@@ -70,6 +70,15 @@ public class RayTracingMaster : MonoBehaviour
         //LightmapEditorSettings.denoiserTypeDirect = LightmapEditorSettings.DenoiserType.Optix;
         //LightmapEditorSettings.denoiserTypeIndirect = LightmapEditorSettings.DenoiserType.Optix;
         _camera = GetComponent<Camera>();
+        if (!XRSettings.enabled && _camera != Camera.main)
+        {
+            gameObject.SetActive(false);
+        }
+
+        if (foveation)
+        {
+            transform.GetChild(0).gameObject.SetActive(true);
+        }
 
         _transformsToWatch.Add(transform);
         _transformsToWatch.Add(DirectionalLight.transform);
@@ -317,7 +326,7 @@ public class RayTracingMaster : MonoBehaviour
         }
     }
 
-    private void GetRenderScale()
+    private void GetRenderScale()//Added by William Sokol Erhard
     {
         if (XRSettings.enabled)
         {
@@ -331,13 +340,15 @@ public class RayTracingMaster : MonoBehaviour
         }
     }
 
-
     private Vector3 lastCameraRot;
     private Vector3 thisCameraRot;
     private float thisCameraFOV;
     public Texture Detail;
     [SerializeField]
     private Material shiftMat;
+
+    [SerializeField]
+    private bool foveation = false;
 
     RenderTexture temp;
     RenderTexture temp2;
@@ -357,66 +368,77 @@ public class RayTracingMaster : MonoBehaviour
         if (_addMaterial == null)
             _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
         
-        _addMaterial.SetFloat("_Sample", 1);   
-
-
-        //    Graphics.Blit(_target, test);
-        //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
+        _addMaterial.SetFloat("_Sample", _currentSample);
 
         //Material temp = new Material(Shader.Find("Standard"));
         //temp.mainTexture = toTexture2D(_converged);
-        //temp.mainTextureOffset = new Vector2(1,1);
+        //temp.mainTextureOffset = new Vector2(1, 1);
         //_converged.Release();
-        //_converged = new RenderTexture(Mathf.RoundToInt(Screen.width*renderScale), Mathf.RoundToInt(Screen.height*renderScale), 0,
+        //_converged = new RenderTexture(Mathf.RoundToInt(Screen.width * renderScale), Mathf.RoundToInt(Screen.height * renderScale), 0,
         //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         //_converged = (RenderTexture)temp.mainTexture;
 
-        if (shiftMat == null)
-            shiftMat = new Material(Shader.Find("Hidden/AddShader"));
-
-        shiftMat.SetFloat("_Sample", _currentSample);
-
-        shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y)  / (thisCameraFOV*Camera.main.aspect));
-        shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x)/ thisCameraFOV);
-
-        //Texture2D temp = new Texture2D(RenderWidth, RenderHight);
-        //CommandBuffer cb = new CommandBuffer();
-        //cb.CopyTexture(_converged, temp);
-
-        if (temp == null || temp2 == null)
+        //Added by William Sokol Erhard
+        if (sampleFrames > 0)
         {
-            Destroy(temp);
-            Destroy(temp2);
-            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            //Graphics.Blit(_target, test);
+            //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
+            if (shiftMat == null)
+                shiftMat = new Material(Shader.Find("Hidden/AddShader"));
+
+
+            shiftMat.SetFloat("_Sample", _currentSample);
+            shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y) / (thisCameraFOV * Camera.main.aspect));
+            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x) / thisCameraFOV);
+
+
+            Graphics.CopyTexture(_converged, temp);
+            //temp = _converged;
+
+            _converged.Release();
+            _converged = new RenderTexture(RenderWidth, RenderHight, 0,
+                    RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            _converged.enableRandomWrite = true;
+            _converged.Create();
+
+            Graphics.Blit(temp, _converged, shiftMat);
+            Graphics.Blit(_target, _converged, _addMaterial);
+            Graphics.Blit(_converged, destination);
+        }
+        else if(foveation)
+        {
+            if (shiftMat == null)
+                shiftMat = new Material(Shader.Find("Hidden/AddShader"));
+            //Texture2D temp = new Texture2D(RenderWidth, RenderHight);
+            //CommandBuffer cb = new CommandBuffer();
+            //cb.CopyTexture(_converged, temp);
+
+            if (temp == null || temp2 == null)
+            {
+                Destroy(temp);
+                Destroy(temp2);
+                temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+                temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            }
+
+            Graphics.Blit(_target, _converged);
+            Graphics.Blit(Detail, temp, shiftMat);
+            Graphics.CopyTexture(temp, 0,0, (int)(temp.width/3),(int)(temp.height/3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0,0, (int)(_converged.width / 3), (int)(_converged.height / 3));
+            //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
+            //Graphics.Blit(_target, _converged, shiftMat);
+            //Graphics.Blit(temp2, _converged, _addMaterial);
+
+            //Graphics.Blit(_converged, _target, _addMaterial);
+
+
+            Graphics.Blit(_converged, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
+        }
+        else
+        {
+            Graphics.Blit(_target, destination);
         }
 
-        //Graphics.CopyTexture(_converged, temp);
-        //temp = _converged;
 
-        //_converged.Release();
-        //_converged = new RenderTexture(RenderWidth, RenderHight, 0,
-        //        RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        //_converged.enableRandomWrite = true;
-        //_converged.Create();        
-
-        //Graphics.Blit(temp, _converged, shiftMat);
-
-        //Destroy(temp);
-
-        Graphics.Blit(_target, _converged);
-        //Graphics.Blit(Detail, temp, shiftMat);
-        //Graphics.CopyTexture(temp, 0,0, (int)(temp.width/3),(int)(temp.height/3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0,0, (int)(_converged.width / 3), (int)(_converged.height / 3));
-        //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
-        //Graphics.Blit(_target, _converged, shiftMat);
-        //Graphics.Blit(temp2, _converged, _addMaterial);
-        
-        //Graphics.Blit(_converged, _target, _addMaterial);
-
-        
-
-        //, Vector2.one, new Vector2((thisCameraRot.y - lastCameraRot.y)*thisCameraFOV/Screen.height, (thisCameraRot.x-lastCameraRot.x)*thisCameraFOV/ Screen.width));
-        Graphics.Blit(_converged, destination);//, Vector2.one, new Vector2(((lastCameraRot.y- thisCameraRot.y) / thisCameraFOV)/Screen.height, ((lastCameraRot.x- thisCameraRot.x) /thisCameraFOV)/ Screen.width));
         if (_currentSample < sampleFrames)
             _currentSample++;
     }

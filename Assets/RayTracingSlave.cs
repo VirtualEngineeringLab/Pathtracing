@@ -345,10 +345,13 @@ public class RayTracingSlave : MonoBehaviour
         int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
-        
+
         //t.Apply();
         //i.Apply();
         //temp.Resize(GetComponentInParent<RayTracingMaster>().RenderWidth, GetComponentInParent<RayTracingMaster>().RenderHight)
+        
+        
+        //Added by William Sokol Erhard
         GetComponentInParent<RayTracingMaster>().Detail = _target;
  
 
