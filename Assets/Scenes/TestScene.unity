@@ -238,7 +238,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &441443189
 Transform:
   m_ObjectHideFlags: 0
@@ -672,7 +672,7 @@ MonoBehaviour:
   RenderWidth: 0
   Detail: {fileID: 0}
   shiftMat: {fileID: 2100000, guid: 22969ba8a3367c34484738d9d2e26374, type: 2}
-  foveation: 1
+  foveation: 0
 --- !u!20 &1053208582
 Camera:
   m_ObjectHideFlags: 0

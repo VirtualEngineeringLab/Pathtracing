@@ -346,8 +346,6 @@ public class RayTracingSlave : MonoBehaviour
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
 
-        //t.Apply();
-        //i.Apply();
         //temp.Resize(GetComponentInParent<RayTracingMaster>().RenderWidth, GetComponentInParent<RayTracingMaster>().RenderHight)
         
         
