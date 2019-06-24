@@ -75,10 +75,7 @@ public class RayTracingMaster : MonoBehaviour
             gameObject.SetActive(false);
         }
 
-        if (foveation)
-        {
-            transform.GetChild(0).gameObject.SetActive(true);
-        }
+        transform.GetChild(0).gameObject.SetActive(foveation);
 
         _transformsToWatch.Add(transform);
         _transformsToWatch.Add(DirectionalLight.transform);
@@ -346,6 +343,8 @@ public class RayTracingMaster : MonoBehaviour
     public Texture Detail;
     [SerializeField]
     private Material shiftMat;
+    [SerializeField]
+    private Material fovMat;
 
     [SerializeField]
     private bool foveation = false;
@@ -379,12 +378,20 @@ public class RayTracingMaster : MonoBehaviour
         //_converged = (RenderTexture)temp.mainTexture;
 
         //Added by William Sokol Erhard
+        if (temp == null || temp2 == null)
+        {
+            Destroy(temp);
+            Destroy(temp2);
+            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        }
+
         if (sampleFrames > 0)
         {
             //Graphics.Blit(_target, test);
             //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
             if (shiftMat == null)
-                shiftMat = new Material(Shader.Find("Hidden/AddShader"));
+                shiftMat = new Material(Shader.Find("Hidden/ShiftMat"));
 
 
             shiftMat.SetFloat("_Sample", _currentSample);
@@ -407,22 +414,14 @@ public class RayTracingMaster : MonoBehaviour
         }
         else if(foveation)
         {
-            if (shiftMat == null)
-                shiftMat = new Material(Shader.Find("Hidden/AddShader"));
+            if (fovMat == null)
+                fovMat = new Material(Shader.Find("Hidden/FovMat"));
             //Texture2D temp = new Texture2D(RenderWidth, RenderHight);
             //CommandBuffer cb = new CommandBuffer();
-            //cb.CopyTexture(_converged, temp);
-
-            if (temp == null || temp2 == null)
-            {
-                Destroy(temp);
-                Destroy(temp2);
-                temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-                temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            }
+            //cb.CopyTexture(_converged, temp);            
 
             Graphics.Blit(_target, _converged);
-            Graphics.Blit(Detail, temp, shiftMat);
+            Graphics.Blit(Detail, temp, fovMat);
             Graphics.CopyTexture(temp, 0,0, (int)(temp.width/3),(int)(temp.height/3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0,0, (int)(_converged.width / 3), (int)(_converged.height / 3));
             //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
             //Graphics.Blit(_target, _converged, shiftMat);

@@ -1,10 +1,12 @@
-﻿Shader "Hidden/AddShaderOriginal"
+﻿Shader "Hidden/ShiftMat"
 {
 	Properties
 	{
-		_MainTex("Texture", 2D) = "white" {}
+		_MainTex ("Texture", 2D) = "white" {}
+		_xOffset ("XOffset", float) = 0
+		_yOffset ("YOffset", float) = 0
 	}
-		SubShader
+	SubShader
 	{
 		// No culling or depth
 		Cull Off ZWrite Off ZTest Always
@@ -15,7 +17,7 @@
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
-
+			
 			#include "UnityCG.cginc"
 
 			struct appdata
@@ -30,20 +32,24 @@
 				float4 vertex : SV_POSITION;
 			};
 
-			v2f vert(appdata v)
+			float _xOffset;
+			float _yOffset;
+
+			v2f vert (appdata v)
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
-				o.uv = v.uv;
+				o.uv.x = v.uv.x + _xOffset;
+				o.uv.y = v.uv.y + _yOffset;
 				return o;
 			}
-
+			
 			sampler2D _MainTex;
 			float _Sample;
 
-			float4 frag(v2f i) : SV_Target
+			float4 frag (v2f i) : SV_Target
 			{
-				return float4(tex2D(_MainTex, i.uv).rgb, 1.0f / (_Sample + 1.0f));
+				return float4(tex2D(_MainTex, i.uv).rgb, 1.0f);
 			}
 			ENDCG
 		}
