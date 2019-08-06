@@ -39,7 +39,12 @@ public class RayTracingMaster : MonoBehaviour
     public Transform obj;
 
     [SerializeField]
-    private uint sampleFrames = 0;
+    private uint sampleFrames = 1;
+
+    [SerializeField]
+    private uint fastSampleFrames = 0;
+
+    private uint actualSampleFrames;
 
     [SerializeField]
     private float renderScale = 1f;
@@ -207,7 +212,7 @@ public class RayTracingMaster : MonoBehaviour
         }
 
         _meshObjectsNeedRebuilding = false;
-        _currentSample = sampleFrames;
+        _currentSample = actualSampleFrames;
 
         // Clear all lists
         _meshObjects.Clear();
@@ -337,6 +342,40 @@ public class RayTracingMaster : MonoBehaviour
         }
     }
 
+    Texture2D toTexture2D(RenderTexture rTex)
+    {
+        Texture2D tex = new Texture2D(RenderWidth, RenderHight, TextureFormat.RGB24, false);
+        RenderTexture.active = rTex;
+        tex.ReadPixels(new Rect(0, 0, rTex.width, rTex.height), 0, 0);
+        RenderTexture.active = _target;
+        tex.Apply();
+        return tex;
+    }
+    RenderTexture Blur(RenderTexture source, int iterations)
+    {
+        RenderTexture result = source; //result will store partial results (blur iterations)
+        Material mat = new Material(Shader.Find("Blur")); //create blur material
+        RenderTexture blit = RenderTexture.GetTemporary((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale)); //get temp RT
+        for (int i = 0; i < iterations; i++)
+        {
+            Graphics.SetRenderTarget(blit);
+            GL.Clear(true, true, Color.black); //avoid artifacts in temp RT by clearing it
+            Graphics.Blit(result, blit, mat); //PERFORM A BLUR ITERATION
+            result = blit; //overwrite partial result
+        }
+        RenderTexture.ReleaseTemporary(blit);
+        return result; //return the last partial result
+    }
+
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
+        thisCameraRot = _camera.transform.rotation.eulerAngles;
+        RebuildMeshObjectBuffers();        
+        Render(source, destination);
+        lastCameraRot = thisCameraRot;
+    }
+
     private Vector3 lastCameraRot;
     private Vector3 thisCameraRot;
     private float thisCameraFOV;
@@ -352,8 +391,13 @@ public class RayTracingMaster : MonoBehaviour
     RenderTexture temp;
     RenderTexture temp2;
 
+    public int MultiRender = 0;
+
+    public int rotationSensitivity = 1;
+
     private void Render(RenderTexture source, RenderTexture destination)
     {
+        SetShaderParameters();
         // Make sure we have a current render target
         InitRenderTexture();
 
@@ -363,11 +407,37 @@ public class RayTracingMaster : MonoBehaviour
         int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
+        float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
+            Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
+            Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
+
+        actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
+
+        if (movement > rotationSensitivity)
+        {
+            actualSampleFrames = fastSampleFrames;
+            _converged.Release();
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
+                    RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            _converged.enableRandomWrite = true;
+            _converged.Create();
+            _currentSample = 0;
+        }
+        else if (movement>rotationSensitivity/2)
+        {
+            actualSampleFrames = sampleFrames / 2;
+        }
+        else
+        {
+            actualSampleFrames = sampleFrames;
+        }
+
+        //Graphics.Blit(_target, _converged);
         // Blit the result texture to the screen
-        if (_addMaterial == null)
-            _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
-        
-        _addMaterial.SetFloat("_Sample", _currentSample);
+        //if (_addMaterial == null)
+        //    _addMaterial = new Material(Shader.Find("Hidden/AddShaderOriginal"));
+
+
 
         //Material temp = new Material(Shader.Find("Standard"));
         //temp.mainTexture = toTexture2D(_converged);
@@ -386,43 +456,46 @@ public class RayTracingMaster : MonoBehaviour
             temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         }
 
-        if (sampleFrames > 0)
+
+        if (actualSampleFrames > 0)
         {
             //Graphics.Blit(_target, test);
             //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
-            if (shiftMat == null)
-                shiftMat = new Material(Shader.Find("Hidden/ShiftMat"));
+            //if (shiftMat == null)
+            //    shiftMat = new Material(Shader.Find("Hidden/ShiftMat"));
 
+            _addMaterial.SetFloat("_Sample", _currentSample);
 
             shiftMat.SetFloat("_Sample", _currentSample);
             shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y) / (thisCameraFOV * Camera.main.aspect));
-            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x) / thisCameraFOV);
+            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x)/ thisCameraFOV);
+            shiftMat.SetFloat("_zOffset", -Mathf.DeltaAngle(lastCameraRot.z, thisCameraRot.z)/ thisCameraFOV);
 
 
             Graphics.CopyTexture(_converged, temp);
             //temp = _converged;
 
             _converged.Release();
-            _converged = new RenderTexture(RenderWidth, RenderHight, 0,
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
                     RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
 
             Graphics.Blit(temp, _converged, shiftMat);
-            Graphics.Blit(_target, _converged, _addMaterial);
+            Graphics.Blit(Blur(_target, 1), _converged, _addMaterial);
             Graphics.Blit(_converged, destination);
         }
-        else if(foveation)
+        else if (foveation)
         {
-            if (fovMat == null)
-                fovMat = new Material(Shader.Find("Hidden/FovMat"));
+            //if (fovMat == null)
+            //    fovMat = new Material(Shader.Find("Hidden/FovMat"));
             //Texture2D temp = new Texture2D(RenderWidth, RenderHight);
             //CommandBuffer cb = new CommandBuffer();
             //cb.CopyTexture(_converged, temp);            
 
             Graphics.Blit(_target, _converged);
             Graphics.Blit(Detail, temp, fovMat);
-            Graphics.CopyTexture(temp, 0,0, (int)(temp.width/3),(int)(temp.height/3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0,0, (int)(_converged.width / 3), (int)(_converged.height / 3));
+            Graphics.CopyTexture(temp, 0, 0, (int)(temp.width / 3), (int)(temp.height / 3), (int)(temp.width / 3), (int)(temp.height / 3), _converged, 0, 0, (int)(_converged.width / 3), (int)(_converged.height / 3));
             //Graphics.Blit(Detail, temp, shiftMat);//, new Vector2(2f,2f), -new Vector2(0.5f,0.5f));
             //Graphics.Blit(_target, _converged, shiftMat);
             //Graphics.Blit(temp2, _converged, _addMaterial);
@@ -434,31 +507,30 @@ public class RayTracingMaster : MonoBehaviour
         }
         else
         {
-            Graphics.Blit(_target, destination);
+            //_addMaterial.SetFloat("_Sample", 0);
+            //Graphics.Blit(_target, _converged);
+            //for (int i =0;i<MultiRender;i++) { 
+            //    SetShaderParameters();
+            //    // Make sure we have a current render target
+            //    InitRenderTexture();
+
+
+            //    // Set the target and dispatch the compute shader
+            //    RayTracingShader.SetTexture(0, "Result", _target);
+            //    threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
+            //    threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
+            //    RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+
+            //    _addMaterial.SetFloat("_Sample", MultiRender);
+            //    Graphics.Blit(_target, _converged, _addMaterial);
+            //}
+
+            //Graphics.Blit(_converged, destination);
+            Graphics.Blit(Blur(_target, 1), destination, shiftMat);
         }
 
 
-        if (_currentSample < sampleFrames)
+        if (_currentSample < actualSampleFrames)
             _currentSample++;
-    }
-
-    Texture2D toTexture2D(RenderTexture rTex)
-    {
-        Texture2D tex = new Texture2D(RenderWidth, RenderHight, TextureFormat.RGB24, false);
-        RenderTexture.active = rTex;
-        tex.ReadPixels(new Rect(0, 0, rTex.width, rTex.height), 0, 0);
-        RenderTexture.active = _target;
-        tex.Apply();
-        return tex;
-    }
-
-    private void OnRenderImage(RenderTexture source, RenderTexture destination)
-    {
-        //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
-        thisCameraRot = _camera.transform.rotation.eulerAngles;
-        RebuildMeshObjectBuffers();
-        SetShaderParameters();
-        Render(source, destination);
-        lastCameraRot = thisCameraRot;
     }
 }

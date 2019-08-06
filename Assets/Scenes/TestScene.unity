@@ -238,7 +238,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &441443189
 Transform:
   m_ObjectHideFlags: 0
@@ -464,7 +464,8 @@ MonoBehaviour:
   SpherePlacementRadius: 20
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   obj: {fileID: 0}
-  sampleFrames: 0
+  sampleFrames: 7
+  fastSampleFrames: 1
   renderScale: 1
   RenderHight: 0
   RenderWidth: 0
@@ -472,6 +473,8 @@ MonoBehaviour:
   shiftMat: {fileID: 2100000, guid: 22969ba8a3367c34484738d9d2e26374, type: 2}
   fovMat: {fileID: 2100000, guid: c3a2c3bb6990e29459f3db8bf6990980, type: 2}
   foveation: 0
+  MultiRender: 0
+  rotationSensitivity: 1
 --- !u!20 &687178267
 Camera:
   m_ObjectHideFlags: 0
@@ -508,11 +511,11 @@ Camera:
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
   m_TargetEye: 2
-  m_HDR: 1
-  m_AllowMSAA: 1
-  m_AllowDynamicResolution: 1
+  m_HDR: 0
+  m_AllowMSAA: 0
+  m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
-  m_OcclusionCulling: 1
+  m_OcclusionCulling: 0
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
 --- !u!1 &981445440
@@ -667,7 +670,8 @@ MonoBehaviour:
   SpherePlacementRadius: 20
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   obj: {fileID: 0}
-  sampleFrames: 0
+  sampleFrames: 7
+  fastSampleFrames: 1
   renderScale: 1
   RenderHight: 0
   RenderWidth: 0
@@ -675,6 +679,8 @@ MonoBehaviour:
   shiftMat: {fileID: 2100000, guid: 22969ba8a3367c34484738d9d2e26374, type: 2}
   fovMat: {fileID: 2100000, guid: c3a2c3bb6990e29459f3db8bf6990980, type: 2}
   foveation: 0
+  MultiRender: 0
+  rotationSensitivity: 1
 --- !u!20 &1053208582
 Camera:
   m_ObjectHideFlags: 0
@@ -711,11 +717,11 @@ Camera:
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
   m_TargetEye: 1
-  m_HDR: 1
-  m_AllowMSAA: 1
-  m_AllowDynamicResolution: 1
+  m_HDR: 0
+  m_AllowMSAA: 0
+  m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
-  m_OcclusionCulling: 1
+  m_OcclusionCulling: 0
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
 --- !u!1 &1244567640
@@ -1020,7 +1026,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1994363004
 Transform:
   m_ObjectHideFlags: 0
