@@ -475,6 +475,7 @@ MonoBehaviour:
   foveation: 0
   MultiRender: 0
   rotationSensitivity: 1
+  imageBlur: 1
 --- !u!20 &687178267
 Camera:
   m_ObjectHideFlags: 0
@@ -681,6 +682,7 @@ MonoBehaviour:
   foveation: 0
   MultiRender: 0
   rotationSensitivity: 1
+  imageBlur: 1
 --- !u!20 &1053208582
 Camera:
   m_ObjectHideFlags: 0
@@ -1026,7 +1028,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1994363004
 Transform:
   m_ObjectHideFlags: 0

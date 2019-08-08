@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.VR;
 using UnityEngine.XR;
+using Random = UnityEngine.Random;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -71,9 +70,7 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Awake()
     {
-        //LightmapEditorSettings.denoiserTypeAO = LightmapEditorSettings.DenoiserType.Optix;
-        //LightmapEditorSettings.denoiserTypeDirect = LightmapEditorSettings.DenoiserType.Optix;
-        //LightmapEditorSettings.denoiserTypeIndirect = LightmapEditorSettings.DenoiserType.Optix;
+
         _camera = GetComponent<Camera>();
         if (!XRSettings.enabled && _camera != Camera.main)
         {
@@ -371,13 +368,17 @@ public class RayTracingMaster : MonoBehaviour
     {
         //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
         thisCameraRot = _camera.transform.rotation.eulerAngles;
+        thisCameraPos = _camera.transform.position;
         RebuildMeshObjectBuffers();        
         Render(source, destination);
         lastCameraRot = thisCameraRot;
+        lastCameraPos = thisCameraPos;
     }
 
     private Vector3 lastCameraRot;
+    private Vector3 lastCameraPos;
     private Vector3 thisCameraRot;
+    private Vector3 thisCameraPos;
     private float thisCameraFOV;
     public Texture Detail;
     [SerializeField]
@@ -393,7 +394,9 @@ public class RayTracingMaster : MonoBehaviour
 
     public int MultiRender = 0;
 
-    public int rotationSensitivity = 1;
+    public int movementSensitivity = 1;
+
+    public bool imageBlur = true;
 
     private void Render(RenderTexture source, RenderTexture destination)
     {
@@ -411,9 +414,9 @@ public class RayTracingMaster : MonoBehaviour
             Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
             Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
 
-        actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
-
-        if (movement > rotationSensitivity)
+        //actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
+        movement = Math.Max(movement, Vector3.Distance(lastCameraPos,thisCameraPos)*10);
+        if (movement > movementSensitivity)
         {
             actualSampleFrames = fastSampleFrames;
             _converged.Release();
@@ -423,7 +426,7 @@ public class RayTracingMaster : MonoBehaviour
             _converged.Create();
             _currentSample = 0;
         }
-        else if (movement>rotationSensitivity/2)
+        else if (movement>movementSensitivity/2)
         {
             actualSampleFrames = sampleFrames / 2;
         }
@@ -448,7 +451,7 @@ public class RayTracingMaster : MonoBehaviour
         //_converged = (RenderTexture)temp.mainTexture;
 
         //Added by William Sokol Erhard
-        if (temp == null || temp2 == null)
+        if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
         {
             Destroy(temp);
             Destroy(temp2);
@@ -482,7 +485,7 @@ public class RayTracingMaster : MonoBehaviour
             _converged.Create();
 
             Graphics.Blit(temp, _converged, shiftMat);
-            Graphics.Blit(Blur(_target, 1), _converged, _addMaterial);
+            Graphics.Blit(imageBlur?Blur(_target, 1): _target, _converged, _addMaterial);
             Graphics.Blit(_converged, destination);
         }
         else if (foveation)
@@ -526,7 +529,7 @@ public class RayTracingMaster : MonoBehaviour
             //}
 
             //Graphics.Blit(_converged, destination);
-            Graphics.Blit(Blur(_target, 1), destination, shiftMat);
+            Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         }
 
 
