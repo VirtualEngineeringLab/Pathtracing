@@ -102,6 +102,12 @@ public class RayTracingMaster : MonoBehaviour
         thisCameraFOV = Camera.main.fieldOfView;
     }
 
+    public void Reset()
+    {
+        SphereSeed = (int)Time.timeSinceLevelLoad + 10000;
+        OnEnable();
+    }
+
     private void OnEnable()
     {       
 
