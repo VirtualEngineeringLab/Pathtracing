@@ -37,16 +37,32 @@ public class RayTracingMaster : MonoBehaviour
 
     public Transform obj;
 
-    [SerializeField]
-    private uint sampleFrames = 1;
+    public void RenderScale(float variable)
+    {
+        renderScale = variable;
+    }
+    public void SamplesPer(float variable)
+    {
+        samplesPerPixel = (int)variable;
+    }
+    public void Accumulation(float variable)
+    {
+        sampleFrames = (uint)variable;
+    }
 
     [SerializeField]
-    private uint fastSampleFrames = 0;
+    private uint sampleFrames = 3;
+
+    [SerializeField]
+    private uint fastSampleFrames = 1;
 
     private uint actualSampleFrames;
 
     [SerializeField]
     private float renderScale = 1f;
+
+    [SerializeField]
+    private int samplesPerPixel = 1;
 
     public int RenderHight;
     public int RenderWidth;
@@ -70,6 +86,8 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Awake()
     {
+
+        XRSettings.eyeTextureResolutionScale = 1f;
 
         _camera = GetComponent<Camera>();
         if (!XRSettings.enabled && _camera != Camera.main)
@@ -288,6 +306,7 @@ public class RayTracingMaster : MonoBehaviour
         RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value, Random.value));
         RayTracingShader.SetFloat("_Seed", Random.value);
+        RayTracingShader.SetInt("_SamplesPerPixel", samplesPerPixel);
 
         Vector3 l = DirectionalLight.transform.forward;
         RayTracingShader.SetVector("_DirectionalLight", new Vector4(l.x, l.y, l.z, DirectionalLight.intensity));
@@ -351,13 +370,13 @@ public class RayTracingMaster : MonoBehaviour
     RenderTexture Blur(RenderTexture source, int iterations)
     {
         RenderTexture result = source; //result will store partial results (blur iterations)
-        Material mat = new Material(Shader.Find("Blur")); //create blur material
+        //blur = new Material(Shader.Find("Blur")); //create blur material
         RenderTexture blit = RenderTexture.GetTemporary((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale)); //get temp RT
         for (int i = 0; i < iterations; i++)
         {
             Graphics.SetRenderTarget(blit);
             GL.Clear(true, true, Color.black); //avoid artifacts in temp RT by clearing it
-            Graphics.Blit(result, blit, mat); //PERFORM A BLUR ITERATION
+            Graphics.Blit(result, blit, blur); //PERFORM A BLUR ITERATION
             result = blit; //overwrite partial result
         }
         RenderTexture.ReleaseTemporary(blit);
@@ -385,18 +404,22 @@ public class RayTracingMaster : MonoBehaviour
     private Material shiftMat;
     [SerializeField]
     private Material fovMat;
+    [SerializeField]
+    public Material blur;
 
     [SerializeField]
-    private bool foveation = false;
+    public bool foveation = false;
 
     RenderTexture temp;
     RenderTexture temp2;
 
-    public int MultiRender = 0;
-
-    public int movementSensitivity = 1;
+    public float movementSensitivity = 1f;
 
     public bool imageBlur = true;
+    public void ImageBlur()
+    {
+        imageBlur = !imageBlur;
+    }
 
     private void Render(RenderTexture source, RenderTexture destination)
     {
@@ -426,7 +449,7 @@ public class RayTracingMaster : MonoBehaviour
             _converged.Create();
             _currentSample = 0;
         }
-        else if (movement>movementSensitivity/2)
+        else if (movement > movementSensitivity / 2)
         {
             actualSampleFrames = sampleFrames / 2;
         }

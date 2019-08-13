@@ -34,7 +34,7 @@ public class RayTracingObject : MonoBehaviour
         if (transform.hasChanged)
         {
             RayTracingMaster.UpdateObject(transform);
-            print("The transform has changed!");
+            //print("The transform has changed!");
             transform.hasChanged = false;
         }
     }
