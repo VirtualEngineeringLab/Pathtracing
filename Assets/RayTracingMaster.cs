@@ -104,7 +104,7 @@ public class RayTracingMaster : MonoBehaviour
 
     public void Reset()
     {
-        SphereSeed = (int)Time.timeSinceLevelLoad + 10000;
+        SphereSeed = (int)Time.timeSinceLevelLoad%1000000 + 100000;
         OnEnable();
     }
 
@@ -422,9 +422,9 @@ public class RayTracingMaster : MonoBehaviour
     public float movementSensitivity = 1f;
 
     public bool imageBlur = true;
-    public void ImageBlur()
+    public void ImageBlur(bool blur)
     {
-        imageBlur = !imageBlur;
+        imageBlur = blur;
     }
 
     private void Render(RenderTexture source, RenderTexture destination)

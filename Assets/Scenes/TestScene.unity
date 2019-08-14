@@ -482,7 +482,7 @@ MonoBehaviour:
   blur: {fileID: 2100000, guid: bc71096313b08b24f8cccf32a4478185, type: 2}
   foveation: 0
   movementSensitivity: 1
-  imageBlur: 0
+  imageBlur: 1
 --- !u!20 &687178267
 Camera:
   m_ObjectHideFlags: 0
@@ -690,7 +690,7 @@ MonoBehaviour:
   blur: {fileID: 2100000, guid: bc71096313b08b24f8cccf32a4478185, type: 2}
   foveation: 0
   movementSensitivity: 1
-  imageBlur: 0
+  imageBlur: 1
 --- !u!20 &1053208582
 Camera:
   m_ObjectHideFlags: 0
@@ -1460,6 +1460,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_IsOn
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1478829019601703959, guid: 65111b048ad3d4541a8942dbd6b60c6a,
+        type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1478829019601703959, guid: 65111b048ad3d4541a8942dbd6b60c6a,
+        type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[1].m_Mode
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1478829019073426135, guid: 65111b048ad3d4541a8942dbd6b60c6a,
         type: 3}

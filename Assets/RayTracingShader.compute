@@ -397,15 +397,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             }
         }
 
-		/*for (int i = 0; i < 4; i++)
-		{
-			RayHit hit2 = Trace(ray2);
-			result += ray2.energy * Shade(ray2, hit2);
 
-			if (!any(ray2.energy))
-				break;
-		}*/
-		//result = 2f;
 
 	}
 	
