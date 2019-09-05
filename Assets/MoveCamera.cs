@@ -15,7 +15,7 @@ public class MoveCamera : MonoBehaviour {
     float rotationX = 0.0f;
 
 
-    private float speed = 5.0f;
+    public float speed = 5.0f;
 
     Transform t;
     private void Start()

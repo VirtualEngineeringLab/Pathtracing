@@ -1,0 +1,412 @@
+﻿#pragma enable_d3d11_debug_symbols 
+
+#pragma kernel PathTrace_uniform_grid
+
+#include "Utils.cginc"
+
+
+RWTexture2D<float4> output;
+
+//scene data
+StructuredBuffer<float4x4> triangle_list;
+StructuredBuffer<float4x4> material_list;
+StructuredBuffer<int> material_index_list;
+StructuredBuffer<uint2> grid_data;
+StructuredBuffer<uint> index_list;
+int num_tris;
+
+float3 grid_min;
+float3 grid_max;
+
+float4 grid_origin;
+float4 grid_size;
+uint num_cells_x;
+uint num_cells_y;
+uint num_cells_z;
+
+//camera data
+float4x4 worldspace_frustum_corners;
+float4 screen_size;
+float4 camera_position;
+
+int start_seed;
+
+struct RayHit
+{
+	float3 position;
+	float distance;
+	float3 normal;
+	float3 albedo;
+	float3 specular;
+	float smoothness;
+	float3 emission;
+	float transparency;
+	float refraction;
+};
+
+
+
+struct CS_INPUT
+{
+	uint3 Gid : SV_GroupID;
+	uint3 GTid : SV_GroupThreadID;
+	uint3 DTid : SV_DispatchThreadID;
+	uint GI : SV_GroupIndex;
+};
+
+
+bool SceneIntersection(Ray ray, out float3 position, out float3 normal, out RayHit hit)
+{
+	//3D DDA
+
+	bool ris = false;
+	float3 p;
+
+	//TODO: try to remove the following branch
+
+	//check if ray origin is inside the voxel grid
+	if (point_inside_box(ray.origin, grid_min, grid_max))
+	{
+		p = ray.origin;
+	}
+	else  //the origin is not in the grid, check if the ray intersects the grid
+	{
+		float tmin, tmax;
+		float3 aabb[2] = { grid_min, grid_max };
+
+		ray_box_intersection(ray, aabb, tmin, tmax);
+
+		if (tmin > tmax)  //no scene intersection
+		{
+			return false;
+		}
+		else
+		{
+			p = ray.origin + tmin * ray.direction;
+		}
+	}
+
+	float3 local_grid_p = (p - grid_origin) * grid_size;
+	local_grid_p = min(local_grid_p, float3(num_cells_x, num_cells_y, num_cells_z) - 0.001);
+	local_grid_p = max(local_grid_p, float3(0, 0, 0) );
+
+	int3 voxel = (int3)(floor(local_grid_p) );
+	uint flat_index = voxel.x + voxel.y * num_cells_x + voxel.z * num_cells_x * num_cells_y;
+
+	//now find tmax and delta
+	int3 step_dir = int3(ray.direction.x > 0 ? 1 : -1, ray.direction.y > 0 ? 1 : -1, ray.direction.z > 0 ? 1 : -1);
+	float3 inv_dir = 1.0 / ray.direction;
+	float3 cell_size = 1.0 / grid_size;
+	float3 tmp = frac(local_grid_p) + (1 - 2 * frac(local_grid_p)) * (step_dir + 1) * 0.5;
+	float3 tMax = tmp * abs(inv_dir) * cell_size;
+	float3 delta = abs(inv_dir) * cell_size;
+
+	bool intersected = false;
+
+	float t = 0;
+	float3 b;  //b are the barycentric coordinates of the intersection, i use them to compute the weighted normal
+
+	//voxel marching
+	//TODO: implement optimizations from Kai Xiao 2012
+	while (voxel.x < num_cells_x && voxel.x >= 0 && voxel.y < num_cells_y && voxel.y >= 0 && voxel.z < num_cells_z && voxel.z >= 0)
+	{
+		flat_index = voxel.x + voxel.y * num_cells_x + voxel.z * num_cells_x * num_cells_y;
+
+		uint start_offset = grid_data[flat_index].x;
+		uint num_tris = grid_data[flat_index].y;
+
+		float min_t = 9999;
+		float3 min_b;
+		float min_tris_index;
+
+		//search for triangle intersection
+		for (int j = start_offset; j < start_offset + num_tris; ++j)
+		{
+			uint tris_index = index_list[j];
+			float4x4 tri = triangle_list[tris_index];
+
+			if (ray_triangle_intersection(ray, tri, t, b))
+			{
+				//TODO: should check if the intersection is inside the current voxel
+
+				if (t < min_t)
+				{
+					min_t = t;
+					min_b = b;
+					min_tris_index = tris_index;
+				}
+
+				intersected = true;
+			}
+		}
+
+		if (intersected)
+		{
+			position = ray.origin + min_t * ray.direction;
+
+			float4x4 tri = triangle_list[min_tris_index];
+			normal = GetNormal(tri, min_b);
+			hit.normal = normal;
+			int material_index = material_index_list[min_tris_index];
+			float4x4 mat = material_list[material_index];
+			hit.position = min_t;
+
+			hit.albedo = mat[0];
+			//hit.albedo = mat[0];
+			hit.position = position;
+			hit.specular = mat[1];
+			hit.smoothness = mat[3].y;
+			//mat[3].y;
+			hit.emission = mat[2];
+			hit.transparency = mat[3].x;
+			//mat[3].x;
+
+			hit.refraction = mat[3].z;
+
+			hit.distance = min_t;
+			//hit.canShadow = mat[3].z;
+
+			ris = true;
+			break;
+		}
+		
+		//go to the next voxel on the ray
+		if (tMax.x < tMax.y)
+		{
+			if (tMax.x < tMax.z)
+			{
+				tMax.x += delta.x;
+				voxel.x += step_dir.x;
+			}
+			else
+			{
+				tMax.z += delta.z;
+				voxel.z += step_dir.z;
+			}
+		}
+		else
+		{
+			if (tMax.y < tMax.z)
+			{
+				tMax.y += delta.y;
+				voxel.y += step_dir.y;
+			}
+			else
+			{
+				tMax.z += delta.z;
+				voxel.z += step_dir.z;
+			}
+		}
+	}
+
+	return ris;
+}
+
+
+
+float3 SampleHemisphere(float3 normal, float alpha, uint seed)
+{
+
+	seed = rand_xorshift(seed);
+	float u = seed * (1.0 / 4294967296.0);
+	seed = rand_xorshift(seed);
+	float v = seed * (1.0 / 4294967296.0);
+	// Sample the hemisphere, where alpha determines the kind of the sampling
+	float cosTheta = pow(u, 1.0f / (alpha + 1.0f));
+	float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+	float phi = 2 * PI *v;
+	float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+
+	// Transform direction to world space
+	return mul(tangentSpaceDir, GetTangentSpace(normal));
+}
+
+float3 Shade(inout Ray ray, RayHit hit, uint seed)
+{
+	if (hit.distance < 1.#INF)
+	{
+		// Calculate chances of diffuse and specular reflection
+		hit.albedo = (min(hit.transparency - hit.specular, hit.albedo) + hit.albedo) / 2;
+		float specChance = energy(hit.specular);
+		float diffChance = energy(hit.albedo);
+		float transparencyChance = (hit.transparency);
+		float sum = specChance + diffChance;
+
+
+		// Roulette-select the ray's path
+
+		float u = seed * (1.0 / 4294967296.0);
+		float roulette = u;
+		//	noise();
+
+		if (roulette < specChance)
+		{
+			//// Specular reflection
+			//ray.origin = hit.position + hit.normal * 0.001f;
+			ray.origin = hit.position;
+			float alpha;
+			if (hit.smoothness < 1) {
+				alpha = SmoothnessToPhongAlpha(hit.smoothness);
+				ray.direction = SampleHemisphere(reflect(ray.direction, hit.normal), alpha,seed);
+				float f = (alpha + 2) / (alpha + 1);
+
+				ray.energy *= (1.0f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);
+			}
+			else {
+				float alpha = 15.0f;
+				ray.direction = (reflect(ray.direction, hit.normal));
+				float f = (alpha + 2) / (alpha + 1);
+				ray.energy *= (1.0f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);
+			}
+
+
+		}
+
+		else if (diffChance > 0 && transparencyChance == 1 && roulette < sum)
+		{
+			//// Diffuse reflection
+			ray.origin = hit.position;
+			//ray.origin = hit.position + hit.normal * 0.001f;
+			ray.direction = SampleHemisphere(hit.normal, 1.0f,seed);
+			ray.energy *= (1.0f / diffChance) * hit.albedo;
+
+
+		}
+
+		else if (transparencyChance < 1) {
+			const float refIdx = hit.refraction;
+			//// Transparency and refraction
+
+			//1.56 ior reflection;
+			float3 outwardNormal;
+			float niOverNt;
+			float3 refracted;
+			float cosine;
+
+			if (dot(ray.direction, hit.normal) > 0) {
+				outwardNormal = -hit.normal;
+				niOverNt = refIdx;
+				cosine = refIdx * dot(ray.direction, hit.normal) / length(ray.direction);
+			}
+			else {
+				outwardNormal = hit.normal;
+				niOverNt = 1.0 / refIdx;
+				cosine = -dot(ray.direction, hit.normal) / length(ray.direction);
+			}
+
+			float reflectProb = lerp(1.0, Schlick(cosine, refIdx),
+				Refract(ray.direction, outwardNormal, niOverNt, refracted));
+
+			float alpha = SmoothnessToPhongAlpha(1 - transparencyChance);
+
+			ray.origin = hit.position;//;
+			ray.direction = refracted;
+
+			float f = (alpha + 2) / (alpha + 1);
+			ray.energy *= (1.0f / diffChance) * (hit.albedo)*(1 - transparencyChance);
+
+
+
+		}
+		else
+		{
+			ray.energy = 0.0f;
+		}
+
+		//Shadow Pass
+		//if (_shadowMode == 1) {
+		//	Ray shadowRay = CreateRay(hit.position + hit.normal * 0.001f, -1 * _DirectionalLight.xyz, ray.uv);
+		//	RayHit shadowHit = Trace(shadowRay);
+		//	if (shadowHit.distance != 1.#INF)
+		//	{
+		//		if (shadowHit.canShadow == 1) {
+		//			ray.energy += float3(0.0f, 0.0f, 0.0f);
+		//			//Clamp min to 1
+		//			ray.energy = ray.energy / 8 / max(0.125, _shadowStrength)/*(normalize(shadowRay.origin + shadowHit.position)/4*/;
+		//		}
+
+		//	}
+		//	else
+		//	{
+		//		ray.origin = hit.position - hit.normal * 0.001f;
+		//		ray.firstHit = false;
+		//		//ray.energy += _LightColor0;
+		//	}
+		//}
+		//else {
+		//ray.origin = hit.position;
+				//hit.position + hit.normal * 0.001f;
+			//ray.firstHit = false;
+		//}
+
+		return hit.emission;
+	}
+	else
+	{
+		// Erase the ray's energy - the sky doesn't reflect anything
+		ray.energy = 0.0f;
+
+
+		return float3(1.5, 1.5, 1.5);
+	}
+}
+
+
+
+
+static const int NUM_BOUNCES = 4;
+
+[numthreads(8, 8, 1)]
+void PathTrace_uniform_grid(CS_INPUT input)
+{
+	if (input.DTid.x < screen_size.x && input.DTid.y < screen_size.y)
+	{
+		//compute view ray
+		float2 uv = float2(input.DTid.xy) / (screen_size.xy - 1);
+		float3 eye_dir = lerp(lerp(worldspace_frustum_corners[0], worldspace_frustum_corners[1], uv.y), lerp(worldspace_frustum_corners[2], worldspace_frustum_corners[3], uv.y), uv.x);
+		eye_dir = normalize(eye_dir);
+
+		Ray ray = MakeRay(camera_position.xyz, eye_dir);
+
+		float3 intersection_position;
+		float3 intersection_normal;
+
+		float weight = 1;
+		float3 L = float3(0, 0, 0);
+
+		//random initial seed using thread id
+		uint seed = wang_hash(input.DTid.x + input.DTid.y * screen_size.x + start_seed);
+		RayHit hit;
+
+		for (int bounce = 0; bounce < NUM_BOUNCES; ++bounce)
+		{
+			if (SceneIntersection(ray, intersection_position, intersection_normal, hit))
+			{
+				seed = rand_xorshift(seed);
+				
+				L += ray.energy * Shade(ray, hit, seed);
+				//L
+
+			}
+			else
+			{
+				L += SimpleGradient(ray) *  ray.energy;  //float3(1.5, 1.5, 1.5) is the temporary skybox value
+
+				if (bounce == 0)
+					//L = float3(0, 0, 0);
+				if (!any(ray.energy))
+					break;
+				break;
+			}
+		
+									
+		}
+
+		float4 ris = output[input.DTid.xy];
+		float num_samples = ris.a;
+		L = 1.0 / (num_samples + 1) * (num_samples * ris.rgb + L);
+		ris = float4(L, num_samples + 1);
+		
+		output[input.DTid.xy] = ris;
+	}
+}

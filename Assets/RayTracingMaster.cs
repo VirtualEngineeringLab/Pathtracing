@@ -90,6 +90,15 @@ public class RayTracingMaster : MonoBehaviour
         XRSettings.eyeTextureResolutionScale = 1f;
 
         _camera = GetComponent<Camera>();
+
+
+        if (AltRenderMode)
+        {
+            Setup(_camera);
+        }
+
+
+
         if (!XRSettings.enabled && _camera != Camera.main)
         {
             gameObject.SetActive(false);
@@ -104,15 +113,15 @@ public class RayTracingMaster : MonoBehaviour
 
     public void Reset()
     {
-        SphereSeed = (int)Time.timeSinceLevelLoad%1000000 + 100000;
+        SphereSeed = (int)Time.timeSinceLevelLoad % 1000000 + 100000;
         OnEnable();
     }
 
     private void OnEnable()
-    {       
+    {
 
-        print(Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale) +" " + Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale));
-        print(Mathf.RoundToInt(Screen.height * renderScale) +" " + Mathf.RoundToInt(Screen.width * renderScale));
+        print(Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale) + " " + Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale));
+        print(Mathf.RoundToInt(Screen.height * renderScale) + " " + Mathf.RoundToInt(Screen.width * renderScale));
 
         _currentSample = 0;
         SetUpScene();
@@ -125,7 +134,7 @@ public class RayTracingMaster : MonoBehaviour
         _vertexBuffer?.Release();
         _indexBuffer?.Release();
     }
-  
+
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.F12))
@@ -152,11 +161,11 @@ public class RayTracingMaster : MonoBehaviour
 
     public static int RegisterObject(RayTracingObject obj)
     {
-        _rayTracingObjects.Add(obj);        
+        _rayTracingObjects.Add(obj);
         _meshObjectsNeedRebuilding = true;
-        return _rayTracingObjects.Count-1;
+        return _rayTracingObjects.Count - 1;
     }
-        
+
     public static void UpdateObject(Transform tra)
     {
         _transformsToWatch.Add(tra);
@@ -211,7 +220,7 @@ public class RayTracingMaster : MonoBehaviour
             // Add the sphere to the list
             spheres.Add(sphere);
 
-            SkipSphere:
+        SkipSphere:
             continue;
         }
 
@@ -340,7 +349,7 @@ public class RayTracingMaster : MonoBehaviour
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _target.enableRandomWrite = true;
             _target.Create();
-            _converged = new RenderTexture((int)(RenderWidth/renderScale), (int)(RenderHight / renderScale), 0,
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
@@ -394,7 +403,7 @@ public class RayTracingMaster : MonoBehaviour
         //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
         thisCameraRot = _camera.transform.rotation.eulerAngles;
         thisCameraPos = _camera.transform.position;
-        RebuildMeshObjectBuffers();        
+        RebuildMeshObjectBuffers();
         Render(source, destination);
         lastCameraRot = thisCameraRot;
         lastCameraPos = thisCameraPos;
@@ -429,6 +438,13 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Render(RenderTexture source, RenderTexture destination)
     {
+        if (AltRenderMode)
+        {
+            AltRender(source,destination);
+            return;
+        }
+
+
         SetShaderParameters();
         // Make sure we have a current render target
         InitRenderTexture();
@@ -444,7 +460,7 @@ public class RayTracingMaster : MonoBehaviour
             Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
 
         //actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
-        movement = Math.Max(movement, Vector3.Distance(lastCameraPos,thisCameraPos)*10);
+        movement = Math.Max(movement, Vector3.Distance(lastCameraPos, thisCameraPos) * 10);
         if (movement > movementSensitivity)
         {
             actualSampleFrames = fastSampleFrames;
@@ -455,10 +471,10 @@ public class RayTracingMaster : MonoBehaviour
             _converged.Create();
             _currentSample = 0;
         }
-        else if (movement > movementSensitivity / 2)
-        {
-            actualSampleFrames = sampleFrames / 2;
-        }
+        //else if (movement > movementSensitivity / 2)
+        //{
+        //    actualSampleFrames = sampleFrames / 2;
+        //}
         else
         {
             actualSampleFrames = sampleFrames;
@@ -480,7 +496,7 @@ public class RayTracingMaster : MonoBehaviour
         //_converged = (RenderTexture)temp.mainTexture;
 
         //Added by William Sokol Erhard
-        if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
+        if (temp == null || temp2 == null || temp.height != _converged.height || temp.width != _converged.width)
         {
             Destroy(temp);
             Destroy(temp2);
@@ -500,8 +516,8 @@ public class RayTracingMaster : MonoBehaviour
 
             shiftMat.SetFloat("_Sample", _currentSample);
             shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y) / (thisCameraFOV * Camera.main.aspect));
-            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x)/ thisCameraFOV);
-            shiftMat.SetFloat("_zOffset", -Mathf.DeltaAngle(lastCameraRot.z, thisCameraRot.z)/ thisCameraFOV);
+            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x) / thisCameraFOV);
+            shiftMat.SetFloat("_zOffset", -Mathf.DeltaAngle(lastCameraRot.z, thisCameraRot.z) / thisCameraFOV);
 
 
             Graphics.CopyTexture(_converged, temp);
@@ -514,7 +530,7 @@ public class RayTracingMaster : MonoBehaviour
             _converged.Create();
 
             Graphics.Blit(temp, _converged, shiftMat);
-            Graphics.Blit(imageBlur?Blur(_target, 1): _target, _converged, _addMaterial);
+            Graphics.Blit(imageBlur ? Blur(_target, 1) : _target, _converged, _addMaterial);
             Graphics.Blit(_converged, destination);
         }
         else if (foveation)
@@ -558,11 +574,109 @@ public class RayTracingMaster : MonoBehaviour
             //}
 
             //Graphics.Blit(_converged, destination);
-            Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
+            Graphics.Blit(imageBlur ? Blur(_target, 1) : _target, destination, shiftMat);
         }
 
 
         if (_currentSample < actualSampleFrames)
             _currentSample++;
+
+
+
+
+
     }
+
+    public bool AltRenderMode = false;
+    private Camera scene_view_camera;
+    private Vector3 last_camera_position;
+    private Quaternion last_camera_rotation;
+    private Matrix4x4 worldspace_frustum_corners;
+
+    private ComputeShader path_tracing_CS;
+    private int groups_x;
+    private int groups_y;
+    private int path_tracing_kernel;
+
+    private Material tonemap_blit;
+
+    private RenderTexture hdr_rt;
+
+    //PUBLIC METHODS
+    public void Setup(Camera cam)
+    {
+        //I must call this function every time the viewport is resized, VERY IMPORTANT
+
+        scene_view_camera = cam;
+
+        path_tracing_CS = Resources.Load<ComputeShader>("PathTracingCS");
+        path_tracing_kernel = path_tracing_CS.FindKernel("PathTrace_uniform_grid");
+        path_tracing_CS.SetVector("screen_size", new Vector4(cam.pixelRect.width, cam.pixelRect.height, 0, 0));
+
+        groups_x = Mathf.CeilToInt(cam.pixelRect.width / 8.0f);
+        groups_y = Mathf.CeilToInt(cam.pixelRect.height / 8.0f);
+
+        tonemap_blit = new Material(Shader.Find("PathTracing/Tonemap"));
+
+        hdr_rt = new RenderTexture((int)cam.pixelRect.width, (int)cam.pixelRect.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        hdr_rt.enableRandomWrite = true;
+        hdr_rt.Create();
+
+        AccelerationStructures.BuildUniformGridGPU();
+        SetUniformGrid();
+    }
+
+    public void Dispose()
+    {
+        if (hdr_rt) hdr_rt.Release();
+    }
+
+    public void SetUniformGrid()
+    {
+        path_tracing_CS.SetBuffer(path_tracing_kernel, "triangle_list", AccelerationStructures.TriangleBuffer);
+        path_tracing_CS.SetBuffer(path_tracing_kernel, "grid_data", AccelerationStructures.GridData);
+        path_tracing_CS.SetBuffer(path_tracing_kernel, "index_list", AccelerationStructures.IndexList);
+        path_tracing_CS.SetBuffer(path_tracing_kernel, "material_list", AccelerationStructures.MaterialBuffer);
+        path_tracing_CS.SetBuffer(path_tracing_kernel, "material_index_list", AccelerationStructures.MaterialIndexBuffer);
+        path_tracing_CS.SetInt("num_tris", AccelerationStructures.NumTris);
+        path_tracing_CS.SetVector("grid_min", AccelerationStructures.SceneBounds.min);
+        path_tracing_CS.SetVector("grid_max", AccelerationStructures.SceneBounds.max);
+        path_tracing_CS.SetVector("grid_origin", AccelerationStructures.GridInfo.grid_origin);
+        path_tracing_CS.SetVector("grid_size", AccelerationStructures.GridInfo.grid_size);
+        path_tracing_CS.SetInt("num_cells_x", (int)AccelerationStructures.GridInfo.nx);
+        path_tracing_CS.SetInt("num_cells_y", (int)AccelerationStructures.GridInfo.ny);
+        path_tracing_CS.SetInt("num_cells_z", (int)AccelerationStructures.GridInfo.nz);
+    }
+
+    private void ResetBuffer()
+    {
+        RenderTexture old = RenderTexture.active;
+        RenderTexture.active = hdr_rt;
+        GL.Clear(false, true, Color.clear);
+        RenderTexture.active = old;
+    }
+
+
+    private void AltRender(RenderTexture source, RenderTexture destination){
+        Vector3[] frustumCorners = new Vector3[4];
+        scene_view_camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), scene_view_camera.farClipPlane, Camera.MonoOrStereoscopicEye.Mono, frustumCorners);
+        worldspace_frustum_corners.SetRow(0, scene_view_camera.transform.TransformVector(frustumCorners[0]));
+        worldspace_frustum_corners.SetRow(1, scene_view_camera.transform.TransformVector(frustumCorners[1]));
+        worldspace_frustum_corners.SetRow(2, scene_view_camera.transform.TransformVector(frustumCorners[3]));
+        worldspace_frustum_corners.SetRow(3, scene_view_camera.transform.TransformVector(frustumCorners[2]));
+        path_tracing_CS.SetMatrix("worldspace_frustum_corners", worldspace_frustum_corners);
+        path_tracing_CS.SetVector("camera_position", scene_view_camera.transform.position);
+
+        path_tracing_CS.SetTexture(path_tracing_kernel, "output", hdr_rt);
+
+        int random_seed = Random.Range(0, int.MaxValue / 100);
+        path_tracing_CS.SetInt("start_seed", random_seed);
+
+        path_tracing_CS.Dispatch(path_tracing_kernel, groups_x, groups_y, 1);
+        
+        Graphics.Blit(hdr_rt, destination, tonemap_blit, 0);
+        ResetBuffer();
+    }
+
+
 }
