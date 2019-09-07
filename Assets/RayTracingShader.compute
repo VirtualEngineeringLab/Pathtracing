@@ -9,7 +9,7 @@ float4 _DirectionalLight;
 
 float2 _PixelOffset;
 
-int _SamplesPerPixel;
+
 
 Texture2D<float4> _SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
@@ -358,6 +358,13 @@ float3 Shade(inout Ray ray, RayHit hit)
 }
 
 
+
+int _SamplesPerPixel;
+
+float4 _FoveateArea;
+int _SuperSampleRate;
+
+
 //-------------------------------------
 //- KERNEL
 
@@ -367,6 +374,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 {
 	float3 result = float3(0, 0, 0);	
 
+	int samples = _SamplesPerPixel;
+	if (id.x > _FoveateArea.x&&id.y > _FoveateArea.y && id.x < _FoveateArea.z&&id.y < _FoveateArea.w) {
+		samples= _SuperSampleRate;
+	}
+
+	int size = sqrt(samples);
 	//id.x%2==0&& id.y % 2 == 0
 	if (true) {
 		_Pixel = id.xy * 2;
@@ -377,10 +390,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 		//id.y = height - id.y;
 
-        for (int j = 0; j < _SamplesPerPixel; j++)
+        for (int j = 0; j < samples; j++)
         {
             // Transform pixel to [-1,1] range
-            float2 uv = float2((id.xy + _PixelOffset * j / _SamplesPerPixel - _PixelOffset) / float2(width, height) * 2.0f - 1.0f);
+            float2 uv = float2(float2(id.x +1/(samples%size), id.y + 1 / (samples/size)) / float2(width, height) * 2.0f - 1.0f);
 		    //float2 uv2 = float2((id.xy) / float2(width, height) * 2.0f - 1.0f);
 
 		    //uv.y = - uv.y;
@@ -390,7 +403,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             for (int i = 0; i < 4; i++)
             {
                 RayHit hit = Trace(ray);
-                result += ray.energy * Shade(ray, hit) * 2 / _SamplesPerPixel;
+                result += ray.energy * Shade(ray, hit) * 2 / samples;
 
                 if (!any(ray.energy))
                     break;

@@ -24,6 +24,9 @@ uint num_cells_x;
 uint num_cells_y;
 uint num_cells_z;
 
+Texture2D<float4> _SkyboxTexture;
+SamplerState sampler_SkyboxTexture;
+
 //camera data
 float4x4 worldspace_frustum_corners;
 float4 screen_size;
@@ -311,6 +314,7 @@ float3 Shade(inout Ray ray, RayHit hit, uint seed)
 		else
 		{
 			ray.energy = 0.0f;
+			
 		}
 
 		//Shadow Pass
@@ -345,9 +349,10 @@ float3 Shade(inout Ray ray, RayHit hit, uint seed)
 	{
 		// Erase the ray's energy - the sky doesn't reflect anything
 		ray.energy = 0.0f;
+		float theta = acos(ray.direction.y) / -PI;
+		float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
 
-
-		return float3(1.5, 1.5, 1.5);
+		return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
 	}
 }
 

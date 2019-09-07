@@ -64,7 +64,7 @@ public class RayTracingMaster : MonoBehaviour
     [SerializeField]
     private int samplesPerPixel = 1;
 
-    public int RenderHight;
+    public int RenderHeight;
     public int RenderWidth;
 
     struct MeshObject
@@ -88,7 +88,7 @@ public class RayTracingMaster : MonoBehaviour
     {
 
         XRSettings.eyeTextureResolutionScale = 1f;
-
+        GetRenderScale();
         _camera = GetComponent<Camera>();
 
 
@@ -319,9 +319,11 @@ public class RayTracingMaster : MonoBehaviour
         RayTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
         RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
         RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
-        RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value, Random.value));
+        RayTracingShader.SetVector("_PixelOffset", new Vector2(0, 0));
         RayTracingShader.SetFloat("_Seed", Random.value);
         RayTracingShader.SetInt("_SamplesPerPixel", samplesPerPixel);
+        RayTracingShader.SetVector("_FoveateArea", new Vector4(RenderWidth/3, RenderHeight / 3, RenderWidth*2/3, RenderHeight * 2/3));
+        RayTracingShader.SetInt("_SuperSampleRate", 4);
 
         Vector3 l = DirectionalLight.transform.forward;
         RayTracingShader.SetVector("_DirectionalLight", new Vector4(l.x, l.y, l.z, DirectionalLight.intensity));
@@ -335,7 +337,7 @@ public class RayTracingMaster : MonoBehaviour
     private void InitRenderTexture()
     {
         GetRenderScale();
-        if (_target == null || _target.width != RenderWidth || _target.height != RenderHight)
+        if (_target == null || _target.width != RenderWidth || _target.height != RenderHeight)
         {
             // Release render texture if we already have one
             if (_target != null)
@@ -345,11 +347,11 @@ public class RayTracingMaster : MonoBehaviour
             }
 
             // Get a render target for Ray Tracing
-            _target = new RenderTexture(RenderWidth, RenderHight, 0,
+            _target = new RenderTexture(RenderWidth, RenderHeight, 0,
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _target.enableRandomWrite = true;
             _target.Create();
-            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
@@ -363,19 +365,19 @@ public class RayTracingMaster : MonoBehaviour
     {
         if (XRSettings.enabled)
         {
-            RenderHight = Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale);
+            RenderHeight = Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale);
             RenderWidth = Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale);
         }
         else
         {
-            RenderHight = Mathf.RoundToInt(Screen.height * renderScale);
+            RenderHeight = Mathf.RoundToInt(Screen.height * renderScale);
             RenderWidth = Mathf.RoundToInt(Screen.width * renderScale);
         }
     }
 
     Texture2D toTexture2D(RenderTexture rTex)
     {
-        Texture2D tex = new Texture2D(RenderWidth, RenderHight, TextureFormat.RGB24, false);
+        Texture2D tex = new Texture2D(RenderWidth, RenderHeight, TextureFormat.RGB24, false);
         RenderTexture.active = rTex;
         tex.ReadPixels(new Rect(0, 0, rTex.width, rTex.height), 0, 0);
         RenderTexture.active = _target;
@@ -386,7 +388,7 @@ public class RayTracingMaster : MonoBehaviour
     {
         RenderTexture result = source; //result will store partial results (blur iterations)
         //blur = new Material(Shader.Find("Blur")); //create blur material
-        RenderTexture blit = RenderTexture.GetTemporary((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale)); //get temp RT
+        RenderTexture blit = RenderTexture.GetTemporary((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale)); //get temp RT
         for (int i = 0; i < iterations; i++)
         {
             Graphics.SetRenderTarget(blit);
@@ -438,6 +440,10 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Render(RenderTexture source, RenderTexture destination)
     {
+        SetShaderParameters();
+        // Make sure we have a current render target
+        InitRenderTexture();
+        actualSampleFrames = sampleFrames;
         if (AltRenderMode)
         {
             AltRender(source,destination);
@@ -452,7 +458,7 @@ public class RayTracingMaster : MonoBehaviour
         // Set the target and dispatch the compute shader
         RayTracingShader.SetTexture(0, "Result", _target);
         int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
-        int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
+        int threadGroupsY = Mathf.CeilToInt(RenderHeight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
         float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
@@ -465,7 +471,7 @@ public class RayTracingMaster : MonoBehaviour
         {
             actualSampleFrames = fastSampleFrames;
             _converged.Release();
-            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
                     RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
@@ -500,8 +506,8 @@ public class RayTracingMaster : MonoBehaviour
         {
             Destroy(temp);
             Destroy(temp2);
-            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         }
 
 
@@ -524,7 +530,7 @@ public class RayTracingMaster : MonoBehaviour
             //temp = _converged;
 
             _converged.Release();
-            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
                     RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
@@ -574,7 +580,7 @@ public class RayTracingMaster : MonoBehaviour
             //}
 
             //Graphics.Blit(_converged, destination);
-            Graphics.Blit(imageBlur ? Blur(_target, 1) : _target, destination, shiftMat);
+            Graphics.Blit(imageBlur ? Blur(_target, 1) : _target, destination);
         }
 
 
@@ -611,14 +617,14 @@ public class RayTracingMaster : MonoBehaviour
 
         path_tracing_CS = Resources.Load<ComputeShader>("PathTracingCS");
         path_tracing_kernel = path_tracing_CS.FindKernel("PathTrace_uniform_grid");
-        path_tracing_CS.SetVector("screen_size", new Vector4(cam.pixelRect.width, cam.pixelRect.height, 0, 0));
+        path_tracing_CS.SetVector("screen_size", new Vector4((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, 0));
 
-        groups_x = Mathf.CeilToInt(cam.pixelRect.width / 8.0f);
-        groups_y = Mathf.CeilToInt(cam.pixelRect.height / 8.0f);
+        groups_x = Mathf.CeilToInt((int)(RenderWidth / renderScale) / 8.0f);
+        groups_y = Mathf.CeilToInt((int)(RenderHeight / renderScale) / 8.0f);
 
         tonemap_blit = new Material(Shader.Find("PathTracing/Tonemap"));
 
-        hdr_rt = new RenderTexture((int)cam.pixelRect.width, (int)cam.pixelRect.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        hdr_rt = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         hdr_rt.enableRandomWrite = true;
         hdr_rt.Create();
 
@@ -633,6 +639,7 @@ public class RayTracingMaster : MonoBehaviour
 
     public void SetUniformGrid()
     {
+        path_tracing_CS.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
         path_tracing_CS.SetBuffer(path_tracing_kernel, "triangle_list", AccelerationStructures.TriangleBuffer);
         path_tracing_CS.SetBuffer(path_tracing_kernel, "grid_data", AccelerationStructures.GridData);
         path_tracing_CS.SetBuffer(path_tracing_kernel, "index_list", AccelerationStructures.IndexList);
@@ -673,8 +680,51 @@ public class RayTracingMaster : MonoBehaviour
         path_tracing_CS.SetInt("start_seed", random_seed);
 
         path_tracing_CS.Dispatch(path_tracing_kernel, groups_x, groups_y, 1);
-        
-        Graphics.Blit(hdr_rt, destination, tonemap_blit, 0);
+
+
+        if (temp == null || temp2 == null || temp.height != _converged.height || temp.width != _converged.width)
+        {
+            Destroy(temp);
+            Destroy(temp2);
+            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        }
+
+
+        if (actualSampleFrames > 0)
+        {
+            //Graphics.Blit(_target, test);
+            //_addMaterial.SetTextureOffset("_MainTex", new Vector2(, );
+            //if (shiftMat == null)
+            //    shiftMat = new Material(Shader.Find("Hidden/ShiftMat"));
+
+            _addMaterial.SetFloat("_Sample", _currentSample);
+
+            shiftMat.SetFloat("_Sample", _currentSample);
+            shiftMat.SetFloat("_xOffset", Mathf.DeltaAngle(lastCameraRot.y, thisCameraRot.y) / (thisCameraFOV * Camera.main.aspect));
+            shiftMat.SetFloat("_yOffset", -Mathf.DeltaAngle(lastCameraRot.x, thisCameraRot.x) / thisCameraFOV);
+            shiftMat.SetFloat("_zOffset", -Mathf.DeltaAngle(lastCameraRot.z, thisCameraRot.z) / thisCameraFOV);
+
+
+            Graphics.CopyTexture(_converged, temp);
+            //temp = _converged;
+
+            _converged.Release();
+            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
+                    RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            _converged.enableRandomWrite = true;
+            _converged.Create();
+
+            Graphics.Blit(temp, _converged, shiftMat);
+            Graphics.Blit(imageBlur ? Blur(hdr_rt, 1) : hdr_rt, _converged, _addMaterial);
+            Graphics.Blit(_converged, destination);
+        }
+        else
+        {
+            Graphics.Blit(imageBlur ? Blur(hdr_rt, 1) : hdr_rt, destination, tonemap_blit, 0);
+        }
+        if (_currentSample < actualSampleFrames)
+            _currentSample++;
         ResetBuffer();
     }
 
