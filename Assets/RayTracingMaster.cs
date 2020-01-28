@@ -37,9 +37,39 @@ public class RayTracingMaster : MonoBehaviour
 
     public Transform obj;
 
+    public float targetFrametime = 0.01f;
+    public bool dynamicRenderScale = true;
+    public void DynamicRenderScale(bool dynamic)
+    {
+        dynamicRenderScale = dynamic;
+    }
+
+    public void RenderScaleCalculation()
+    {
+        if (dynamicRenderScale)
+        {
+            float t;
+            if (XRStats.TryGetGPUTimeLastFrame(out t))
+            {
+                print(t);
+            }
+            print(Time.deltaTime.ToString() +" | "+targetFrametime);
+            if (Time.deltaTime > targetFrametime)
+            {
+                RenderScale(renderScale -=0.1f);
+            }
+            else if (Time.deltaTime < 0.5f * targetFrametime)
+            {
+                RenderScale(renderScale +=0.1f);
+            }
+        }
+    }
+
     public void RenderScale(float variable)
     {
         renderScale = variable;
+        print(Mathf.RoundToInt(XRSettings.eyeTextureHeight * renderScale) + " " + Mathf.RoundToInt(XRSettings.eyeTextureWidth * renderScale));
+        print(Mathf.RoundToInt(Screen.height * renderScale) + " " + Mathf.RoundToInt(Screen.width * renderScale));
     }
     public void SamplesPer(float variable)
     {
@@ -86,7 +116,7 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Awake()
     {
-
+        //InvokeRepeating("RenderScaleCalculation",1f,1f);
         XRSettings.eyeTextureResolutionScale = 1f;
         GetRenderScale();
         _camera = GetComponent<Camera>();
@@ -461,27 +491,27 @@ public class RayTracingMaster : MonoBehaviour
         int threadGroupsY = Mathf.CeilToInt(RenderHeight / 32.0f);
         RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
 
-        float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
-            Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
-            Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
+        //float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
+        //    Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
+        //    Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
 
-        //actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
-        movement = Math.Max(movement, Vector3.Distance(lastCameraPos, thisCameraPos) * 10);
-        if (movement > movementSensitivity)
-        {
-            actualSampleFrames = fastSampleFrames;
-            _converged.Release();
-            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
-                    RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            _converged.enableRandomWrite = true;
-            _converged.Create();
-            _currentSample = 0;
-        }
-        //else if (movement > movementSensitivity / 2)
+        ////actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
+        //movement = Math.Max(movement, Vector3.Distance(lastCameraPos, thisCameraPos) * 10);
+        //if (movement > movementSensitivity)
         //{
-        //    actualSampleFrames = sampleFrames / 2;
+        //    actualSampleFrames = fastSampleFrames;
+        //    _converged.Release();
+        //    _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHeight / renderScale), 0,
+        //            RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        //    _converged.enableRandomWrite = true;
+        //    _converged.Create();
+        //    _currentSample = 0;
         //}
-        else
+        ////else if (movement > movementSensitivity / 2)
+        ////{
+        ////    actualSampleFrames = sampleFrames / 2;
+        ////}
+        //else
         {
             actualSampleFrames = sampleFrames;
         }

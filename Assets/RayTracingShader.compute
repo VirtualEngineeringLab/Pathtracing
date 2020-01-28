@@ -375,9 +375,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	float3 result = float3(0, 0, 0);	
 
 	int samples = _SamplesPerPixel;
-	if (id.x > _FoveateArea.x&&id.y > _FoveateArea.y && id.x < _FoveateArea.z&&id.y < _FoveateArea.w) {
+	/*if (id.x > _FoveateArea.x&&id.y > _FoveateArea.y && id.x < _FoveateArea.z&&id.y < _FoveateArea.w) {
 		samples= _SuperSampleRate;
-	}
+	}*/
 
 	int size = sqrt(samples);
 	//id.x%2==0&& id.y % 2 == 0
