@@ -382,7 +382,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	int size = sqrt(samples);
 	//id.x%2==0&& id.y % 2 == 0
 	if (true) {
-		_Pixel = id.xy * 2;
+        _Pixel = id.xy;// *2;
 
 		// Get the dimensions of the RenderTexture
 		uint width, height;
@@ -403,7 +403,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             for (int i = 0; i < 4; i++)
             {
                 RayHit hit = Trace(ray);
-                result += ray.energy * Shade(ray, hit) * 2 / samples;
+                result += ray.energy * Shade(ray, hit) / samples;
 
                 if (!any(ray.energy))
                     break;
