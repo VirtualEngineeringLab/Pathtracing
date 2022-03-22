@@ -2,7 +2,6 @@
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.VR;
 using UnityEngine.XR;
 
 public class RayTracingSlave : MonoBehaviour
@@ -348,8 +347,7 @@ public class RayTracingSlave : MonoBehaviour
 
         //temp.Resize(GetComponentInParent<RayTracingMaster>().RenderWidth, GetComponentInParent<RayTracingMaster>().RenderHight)
         
-        
-        //Added by William Sokol Erhard
+
         GetComponentInParent<RayTracingMaster>().Detail = _target;
  
 
