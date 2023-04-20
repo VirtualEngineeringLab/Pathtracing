@@ -530,11 +530,11 @@ public class RayTracingMaster : MonoBehaviour
             
       
             
-            
+            Debug.LogError("rendering");
             Graphics.Blit(source, _converged);
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, _converged, _addMaterial);
             _renderTextureMat.mainTexture = _converged;
-            Graphics.Blit(_converged, destination);            
+            Graphics.Blit(_target, destination);            
         }
         else{
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
