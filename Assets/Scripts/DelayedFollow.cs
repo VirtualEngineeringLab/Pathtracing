@@ -5,6 +5,7 @@ using UnityEngine;
 public class DelayedFollow : MonoBehaviour
 {
     [SerializeField] private Camera _target;
+    [SerializeField] private MeshFilter _meshFilter;
     [SerializeField] private int _framesOfDelay = 1;
     
     private Queue<(Vector3, Quaternion)> _poseHistory  = new Queue<(Vector3, Quaternion)>();
@@ -16,27 +17,103 @@ public class DelayedFollow : MonoBehaviour
     public float xPosOffset = 0.1f;
     public float yPosOffset = 0.1f;
 
-    void ResetScaleAndOffset(){
-        _currentFOV = _target.fieldOfView;
-       
-        var frustumHeight = 2.0f * transform.localScale.z * Mathf.Tan(_currentFOV * 0.5f * Mathf.Deg2Rad);
-        var frustumWidth = frustumHeight * _target.aspect; 
-        transform.localScale = new Vector3(frustumWidth, frustumHeight, transform.localScale.z);
+    void Start()
+     {
+         StartCoroutine(LateStart());
+     }
+ 
+     IEnumerator LateStart()
+     {
+        yield return new WaitForSeconds(0.5f);
+        // yield return null;
+        var camera = _target;
         if(_target.stereoEnabled){
-            // bool left = _target.stereoTargetEye == StereoTargetEyeMask.Left;
-            // var matrix = _target.projectionMatrix.inverse;//_target.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
-            // frustumHeight = (2.0f * transform.localScale.z) /matrix[1,1];
-            transform.localScale = new Vector3(frustumWidth*wOffset, frustumHeight*hOffset, transform.localScale.z);
-        }        
+            bool left = _target.stereoTargetEye == StereoTargetEyeMask.Left;
+
+            camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.farClipPlane, 
+            left?Camera.MonoOrStereoscopicEye.Left:Camera.MonoOrStereoscopicEye.Right, 
+            corners);
+
+            // for (int i = 0; i < 4; i++)
+            // {
+            //     var worldSpaceCorner = camera.transform.TransformVector(corners[i]);
+            //     Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.green);
+            // }
+
+            var worldSpaceCorner = camera.transform.TransformVector(corners[0]);
+            Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.black);
+            worldSpaceCorner = camera.transform.TransformVector(corners[1]);
+            Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.yellow);
+            worldSpaceCorner = camera.transform.TransformVector(corners[2]);
+            Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.red);
+            worldSpaceCorner = camera.transform.TransformVector(corners[3]);
+            Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.green);
+
+      
+        }else
+        {
+            camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.farClipPlane, Camera.MonoOrStereoscopicEye.Mono, corners);
+
+            for (int i = 0; i < 4; i++)
+            {
+                var worldSpaceCorner = camera.transform.TransformVector(corners[i]);
+                Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.blue);
+            }
+        }
+
+
+        Vector3[] vertices = new Vector3[4]
+        {
+            corners[0].normalized*5-0.25f*camera.transform.forward,
+            corners[3].normalized*5-0.25f*camera.transform.forward,
+            corners[1].normalized*5-0.25f*camera.transform.forward,
+            corners[2].normalized*5-0.25f*camera.transform.forward,
+
+            // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[0])).normalized*5-0.1f*camera.transform.forward),
+            // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[3]) ).normalized*5-0.1f*camera.transform.forward),           
+            // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[1])).normalized*5-0.1f*camera.transform.forward),
+            // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[2]) ).normalized*5-0.1f*camera.transform.forward),           
+
+        };
+        // for (int i = 2; i < 6; i++)
+        // {
+        //     var worldSpaceCorner = camera.transform.TransformVector(corners[i%4]);
+        //     vertices[i%4] = (worldSpaceCorner - camera.transform.position).normalized + camera.transform.position;
+        // }
+
+        _meshFilter.mesh.vertices = vertices;
+        
+        
     }
+
+    // void ResetScaleAndOffset(){
+    //     _currentFOV = _target.fieldOfView;
+       
+    //     var frustumHeight = 2.0f * transform.localScale.z * Mathf.Tan(_currentFOV * 0.5f * Mathf.Deg2Rad);
+    //     var frustumWidth = frustumHeight * _target.aspect; 
+    //     transform.localScale = new Vector3(frustumWidth, frustumHeight, transform.localScale.z);
+    //     if(_target.stereoEnabled){
+    //         // bool left = _target.stereoTargetEye == StereoTargetEyeMask.Left;
+    //         // var matrix = _target.projectionMatrix.inverse;//_target.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
+    //         // frustumHeight = (2.0f * transform.localScale.z) /matrix[1,1];
+    //         transform.localScale = new Vector3(frustumWidth*wOffset, frustumHeight*hOffset, transform.localScale.z);
+    //     }        
+    // }
+
+    private Vector3[] corners = new Vector3[4];
 
     // Update is called once per frame
     void Update()
     {
-        //if(_currentFOV != Camera.main.fieldOfView)
-        {
-            ResetScaleAndOffset();
-        }
+        // Awake();
+        // transform.position = _target.transform.position+_target.transform.forward*transform.localScale.z;
+        // transform.rotation = _target.transform.rotation;
+
+
+        // if(_currentFOV != Camera.main.fieldOfView)
+        // {
+        //     ResetScaleAndOffset();
+        // }
         Vector3 pos;
         Quaternion rot;
         if(_target.stereoEnabled){
@@ -53,10 +130,10 @@ public class DelayedFollow : MonoBehaviour
             rot = _target.transform.rotation;
         }else
         {
-            pos = _target.transform.position+_target.transform.forward*transform.localScale.z;
+            pos = _target.transform.position+_target.transform.forward*0.25f;
             rot = _target.transform.rotation;
         }
-        
+            
         _poseHistory.Enqueue((pos, rot));//_target.transform.rotation*Quaternion.Euler(0,angleOffset,0)));
         if(_poseHistory.Count>_framesOfDelay){
             var temp = _poseHistory.Dequeue();

@@ -20,12 +20,13 @@ public class RayTracingMaster : MonoBehaviour
     public float SpherePlacementRadius = 100.0f;
 
     private Camera _camera;
+    private Projector _projector;
     private float _lastFieldOfView;
     private RenderTexture _target;
-    private RenderTexture _converged;
+    [SerializeField] private RenderTexture _converged;
     [SerializeField]
     private Material _addMaterial;
-    private uint _currentSample = 0;
+    [SerializeField] private uint _currentSample = 0;
     private ComputeBuffer _sphereBuffer;
     private static List<Transform> _transformsToWatch = new List<Transform>();
     private static bool _meshObjectsNeedRebuilding = false;
@@ -92,6 +93,7 @@ public class RayTracingMaster : MonoBehaviour
         XRSettings.eyeTextureResolutionScale = 1f;
 
         _camera = GetComponent<Camera>();
+        _projector = GetComponent<Projector>();
         if (!XRSettings.enabled && _camera != Camera.main)
         {
             gameObject.SetActive(false);
@@ -130,6 +132,34 @@ public class RayTracingMaster : MonoBehaviour
   
     private void Update()
     {
+        // this example shows the different camera frustums when using asymmetric projection matrices (like those used by OpenVR).
+
+        // var camera = GetComponent<Camera>();
+        // Vector3[] frustumCorners = new Vector3[4];
+        // camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.farClipPlane, Camera.MonoOrStereoscopicEye.Mono, frustumCorners);
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     var worldSpaceCorner = camera.transform.TransformVector(frustumCorners[i]);
+        //     Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.blue);
+        // }
+
+        // camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.farClipPlane, Camera.MonoOrStereoscopicEye.Left, frustumCorners);
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     var worldSpaceCorner = camera.transform.TransformVector(frustumCorners[i]);
+        //     Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.green);
+        // }
+
+        // camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.farClipPlane, Camera.MonoOrStereoscopicEye.Right, frustumCorners);
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     var worldSpaceCorner = camera.transform.TransformVector(frustumCorners[i]);
+        //     Debug.DrawRay(camera.transform.position, worldSpaceCorner, Color.red);
+        // }
+        
         // if (Input.GetKeyDown(KeyCode.F12))
         // {
         //     //ScreenCapture.CaptureScreenshot(Time.time + "-" + _currentSample + ".png");
@@ -476,6 +506,8 @@ public class RayTracingMaster : MonoBehaviour
         {
             actualSampleFrames = sampleFrames;
         }
+
+
         if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
         {
             Destroy(temp);
@@ -497,11 +529,12 @@ public class RayTracingMaster : MonoBehaviour
 
             
       
-            Graphics.Blit(source, destination);
+            
             
             Graphics.Blit(source, _converged);
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, _converged, _addMaterial);
             _renderTextureMat.mainTexture = _converged;
+            Graphics.Blit(_converged, destination);            
         }
         else{
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
@@ -510,5 +543,7 @@ public class RayTracingMaster : MonoBehaviour
 
         if (_currentSample < actualSampleFrames)
             _currentSample++;
+        else
+            _currentSample = actualSampleFrames;
     }
 }

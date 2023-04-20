@@ -43,8 +43,14 @@
 
 			float4 frag(v2f i) : SV_Target
 			{
-				float t = 1.0f+_Sample;
-				return float4(tex2D(_MainTex, i.uv).rgb, 1.0f/t);
+				//float4 rgba = ;
+				// if(tex2D(_MainTex, i.uv).r<0.1 && tex2D(_MainTex, i.uv).g<0.1 && tex2D(_MainTex, i.uv).b<0.1){
+				// 	return float4(tex2D(_MainTex, i.uv).aaa, 0);
+				// }
+				float t = 1.0+_Sample;
+				return float4(tex2D(_MainTex, i.uv).rgb, 1.0/t)*tex2D(_MainTex, i.uv).a;
+				//return float4(tex2D(_MainTex, i.uv).rgb, tex2D(_MainTex, i.uv).a/t);
+				//return lerp(tex2D(_MainTex, i.uv).rgba, tex2D(SV_Target, i.uv).rgba, 1/t);
 			}
 			ENDCG
 		}
