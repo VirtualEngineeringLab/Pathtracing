@@ -64,10 +64,10 @@ public class DelayedFollow : MonoBehaviour
 
         Vector3[] vertices = new Vector3[4]
         {
-            corners[0].normalized*5-0.25f*camera.transform.forward,
-            corners[3].normalized*5-0.25f*camera.transform.forward,
-            corners[1].normalized*5-0.25f*camera.transform.forward,
-            corners[2].normalized*5-0.25f*camera.transform.forward,
+            corners[0].normalized*10-0.25f*camera.transform.forward,
+            corners[3].normalized*10-0.25f*camera.transform.forward,
+            corners[1].normalized*10-0.25f*camera.transform.forward,
+            corners[2].normalized*10-0.25f*camera.transform.forward,
 
             // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[0])).normalized*5-0.1f*camera.transform.forward),
             // camera.transform.InverseTransformPoint((camera.transform.TransformVector(corners[3]) ).normalized*5-0.1f*camera.transform.forward),           

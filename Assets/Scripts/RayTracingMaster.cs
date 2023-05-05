@@ -89,7 +89,7 @@ public class RayTracingMaster : MonoBehaviour
 
     private void Awake()
     {
-
+        
         XRSettings.eyeTextureResolutionScale = 1f;
 
         _camera = GetComponent<Camera>();
@@ -353,10 +353,10 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
             RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         }
-        RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value, Random.value));
+        RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
         RayTracingShader.SetFloat("_Seed", Random.value);
         RayTracingShader.SetInt("_SamplesPerPixel", samplesPerPixel);
-
+        RayTracingShader.SetInt("_Depth", depth? 1 : 0);
         Vector3 l = DirectionalLight.transform.forward;
         RayTracingShader.SetVector("_DirectionalLight", new Vector4(l.x, l.y, l.z, DirectionalLight.intensity));
 
@@ -459,8 +459,8 @@ public class RayTracingMaster : MonoBehaviour
     [SerializeField]
     public bool foveation = false;
 
-    RenderTexture temp;
-    RenderTexture temp2;
+    // RenderTexture temp;
+    // RenderTexture temp2;
 
     public float movementSensitivity = 1f;
 
@@ -469,6 +469,8 @@ public class RayTracingMaster : MonoBehaviour
     {
         imageBlur = blur;
     }
+
+    public bool depth = false;
 
     private void Render(RenderTexture source, RenderTexture destination)
     {
@@ -487,37 +489,38 @@ public class RayTracingMaster : MonoBehaviour
             Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
 
         //actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
-        movement = Math.Max(movement, Vector3.Distance(lastCameraPos,thisCameraPos)*10);
-        if (movement > movementSensitivity)
-        {
-            actualSampleFrames = fastSampleFrames;
-            _converged.Release();
-            _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
-                    RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            _converged.enableRandomWrite = true;
-            _converged.Create();
-            _currentSample = 0;
-        }
-        else if (movement > movementSensitivity / 2)
-        {
-            actualSampleFrames = sampleFrames / 2;
-        }
-        else
+        // movement = Math.Max(movement, Vector3.Distance(lastCameraPos,thisCameraPos)*10);
+        // if (movement > movementSensitivity)
+        // {
+        //     actualSampleFrames = fastSampleFrames;
+        //     _renderTextureMat.mainTexture = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear); 
+        //     // _converged.Release();
+        //     // _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
+        //     //         RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        //     // _converged.enableRandomWrite = true;
+        //     // _converged.Create();
+        //     _currentSample = 0;
+        // }
+        // else if (movement > movementSensitivity / 2)
+        // {
+        //     actualSampleFrames = sampleFrames / 2;
+        // }
+        // else
         {
             actualSampleFrames = sampleFrames;
         }
 
-
-        if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
-        {
-            Destroy(temp);
-            Destroy(temp2);
-            temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-            temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
-        }
+        
+        // if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
+        // {
+        //     Destroy(temp);
+        //     Destroy(temp2);
+        //     temp = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        //     temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        // }
 
         if(_renderTextureMat != null){            
-            _addMaterial.SetFloat("_Sample", _currentSample);
+            _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
 
             // _converged.Release();
             // _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
@@ -530,11 +533,11 @@ public class RayTracingMaster : MonoBehaviour
             
       
             
-            Debug.LogError("rendering");
+
             Graphics.Blit(source, _converged);
-            Graphics.Blit(imageBlur?Blur(_target, 1): _target, _converged, _addMaterial);
-            _renderTextureMat.mainTexture = _converged;
-            Graphics.Blit(_target, destination);            
+            Graphics.Blit(_converged, _target, _addMaterial);
+            _renderTextureMat.mainTexture = _target;
+            Graphics.Blit(_target, destination);              
         }
         else{
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);

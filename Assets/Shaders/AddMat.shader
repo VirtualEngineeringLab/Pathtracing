@@ -47,8 +47,22 @@
 				// if(tex2D(_MainTex, i.uv).r<0.1 && tex2D(_MainTex, i.uv).g<0.1 && tex2D(_MainTex, i.uv).b<0.1){
 				// 	return float4(tex2D(_MainTex, i.uv).aaa, 0);
 				// }
-				float t = 1.0+_Sample;
-				return float4(tex2D(_MainTex, i.uv).rgb, 1.0/t)*tex2D(_MainTex, i.uv).a;
+
+
+				// float alpha = 1.0;
+				// if(tex2D(_MainTex, i.uv).r == 0.0 && tex2D(_MainTex, i.uv).g == 0.0 && tex2D(_MainTex, i.uv).b == 0.0){
+				// 	alpha=0;
+				// }
+				float alpha = tex2D(_MainTex, i.uv).a;
+				float firefly = 0.8;
+				if(tex2D(_MainTex, i.uv).r>firefly||tex2D(_MainTex, i.uv).g>firefly||tex2D(_MainTex, i.uv).b>firefly){
+					 alpha = 0.1;
+				}
+
+				float t = 1.0+_Sample*alpha;
+				return float4(tex2D(_MainTex, i.uv).rgb, 1.0-1.0/t);
+
+				
 				//return float4(tex2D(_MainTex, i.uv).rgb, tex2D(_MainTex, i.uv).a/t);
 				//return lerp(tex2D(_MainTex, i.uv).rgba, tex2D(SV_Target, i.uv).rgba, 1/t);
 			}

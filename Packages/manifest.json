@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.unity.package-manager-ui": "2.2.0",
+    "com.unity.ide.vscode": "1.2.5",
     "com.unity.render-pipelines.high-definition": "14.0.7",
     "com.unity.textmeshpro": "3.0.6",
     "com.unity.xr.management": "4.2.1",
