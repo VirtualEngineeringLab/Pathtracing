@@ -371,7 +371,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 	
 	if (_Depth==1) {
-		 uint width, height;
+		uint width, height;
         Result.GetDimensions(width, height);
         float2 uv = float2((id.xy) / float2(width, height) * 2.0f - 1.0f);
 
@@ -415,5 +415,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                 break;
         }
     }
-    Result[id.xy] = float4(result, 1);   
+    
+    float2 uv = float2((id.xy) / float2(width, height) * 2.0f - 1.0f);
+
+    Ray ray = CreateCameraRay(uv);
+    RayHit hit = Trace(ray);
+    float dis = hit.distance/128.0;
+    Result[id.xy] = float4(result, dis);   
 }

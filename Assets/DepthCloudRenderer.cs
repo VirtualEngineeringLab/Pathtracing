@@ -10,8 +10,8 @@ public class DepthCloudRenderer : MonoBehaviour
     public RenderTexture _renderTexture;
     public Material _renderTextureMat;
     VisualEffect _vFX;
-    int _width = 3840;
-    int _height = 2160;
+    int _width = 1000;//3840;
+    int _height = 1;//2160;
 
     bool isDirty = false;
     int particleCount;
@@ -40,29 +40,20 @@ public class DepthCloudRenderer : MonoBehaviour
             _vFX.SetUInt(Shader.PropertyToID("Width"), (uint)_width);
         }
 
-        Rasterize(ToTexture2D(_renderTextureMat.mainTexture));
-    }
-    public static Texture2D ToTexture2D(Texture texture)
-    {
-        return Texture2D.CreateExternalTexture(
-            texture.width,
-            texture.height,
-            TextureFormat.RGB24,
-            false, false,
-            texture.GetNativeTexturePtr());
+        Rasterize();//_renderTextureMat.mainTexture.ToTexture2D());
     }
 
-    public void Rasterize(Texture2D RenderImage){
+    public void Rasterize(){
         var cam = Camera.main.transform;
         // _renderTexture = RenderImage;
-        particleCount = 100;//(int)(RenderImage.height*RenderImage.width);
+        particleCount = _width;//(int)(RenderImage.height*RenderImage.width);
         int count = 0;
         Vector3[] positions = new Vector3[particleCount]; 
         Color[] colors = new Color[particleCount];
-        for(int i = 0; i<RenderImage.height; i++){
-            for(int j = 0; j<RenderImage.width; j++){
+        for(int i = 0; i<1; i++){
+            for(int j = 0; j<_width; j++){
                 positions[count] = cam.position + cam.forward+cam.right*0.01f*j+cam.forward+cam.up*0.01f*i;//RenderImage.GetPixel(i,j);
-                colors[count++] = RenderImage.GetPixel(i,j);
+                colors[count++] = Color.red;//RenderImage.GetPixel(i,j);
             }
         }
         Rasterize(positions, colors);

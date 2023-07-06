@@ -22,7 +22,7 @@ public class RayTracingMaster : MonoBehaviour
     private Camera _camera;
     private Projector _projector;
     private float _lastFieldOfView;
-    private RenderTexture _target;
+    public RenderTexture _target;
     [SerializeField] private RenderTexture _converged;
     [SerializeField]
     private Material _addMaterial;
@@ -568,6 +568,57 @@ public class RayTracingMaster : MonoBehaviour
         else{
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         }
+
+
+        if (_currentSample < actualSampleFrames)
+            _currentSample++;
+        else
+            _currentSample = actualSampleFrames;
+    }
+
+    void LateUpdate(){
+        RebuildMeshObjectBuffers();        
+
+        SetShaderParameters();
+        // Make sure we have a current render target
+        InitRenderTexture();
+
+        RenderPathtracingStatic = RenderPathtracing;
+        if(RenderPathtracing){
+            // Set the target and dispatch the compute shader
+            RayTracingShader.SetTexture(0, "Result", _target);
+            int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
+            int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
+            RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+        }else{
+            RenderDirty = true;
+            _currentSample = 0;
+            // Graphics.Blit(source, destination);          
+            return;
+        }
+
+        float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
+            Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
+            Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
+
+        actualSampleFrames = sampleFrames;
+
+        if(_renderTextureMat != null){   
+            // _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
+            // if(_currentSample>0){
+            //      Graphics.Blit(source, _target, _addMaterial);
+            // }
+            _renderTextureMat.mainTexture = _target;
+            // Graphics.Blit(_target, destination);    
+
+            if(RenderDirty){
+                RenderDirty = false;  
+                return;    
+            }
+        }
+        // else{
+        //     // Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
+        // }
 
 
         if (_currentSample < actualSampleFrames)
