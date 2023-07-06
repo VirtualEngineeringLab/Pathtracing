@@ -1,6 +1,6 @@
 # Pathtracing
 
-This project is William Sokol Erhard's testbed to explore all variety of techniques and approaches to enable realtime pathtracing with XR.
+This project is [William Sokol Erhard](https://www.linkedin.com/in/willse/)'s testbed to explore all variety of techniques and approaches to enable realtime pathtracing with XR.
 
 Notable implemented features: steroscopic rendering, planer and depth reprojection, acceleration structures for complex meshes, local multiplatform support for Android & HoloLens, depth buffer, and various denoising techniques among many others.
 
