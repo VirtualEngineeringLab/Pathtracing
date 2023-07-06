@@ -2,7 +2,6 @@
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.VR;
 using UnityEngine.XR;
 
 public class RayTracingSlave : MonoBehaviour
