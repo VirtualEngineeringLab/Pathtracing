@@ -24,7 +24,7 @@ public class DelayedFollow : MonoBehaviour
  
      IEnumerator LateStart()
      {
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(0.05f);
         // yield return null;
         var camera = _target;
         if(_target.stereoEnabled){
@@ -82,6 +82,7 @@ public class DelayedFollow : MonoBehaviour
         // }
 
         _meshFilter.mesh.vertices = vertices;
+        _meshFilter.mesh.bounds = new Bounds(camera.transform.position+camera.transform.forward*10f, Vector3.one*10f);
         
         
     }
@@ -105,6 +106,7 @@ public class DelayedFollow : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if(!RayTracingMaster.RenderPathtracingStatic){return;}
         // Awake();
         // transform.position = _target.transform.position+_target.transform.forward*transform.localScale.z;
         // transform.rotation = _target.transform.rotation;

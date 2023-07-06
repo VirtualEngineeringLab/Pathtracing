@@ -265,7 +265,7 @@ public class RayTracingMaster : MonoBehaviour
         }
 
         _meshObjectsNeedRebuilding = false;
-        _currentSample = actualSampleFrames;
+        // _currentSample = actualSampleFrames;
 
         // Clear all lists
         _meshObjects.Clear();
@@ -472,17 +472,38 @@ public class RayTracingMaster : MonoBehaviour
 
     public bool depth = false;
 
+    public void ImageDepth(bool depthI)
+    {
+        depth = depthI;
+    }
+
+    public bool RenderPathtracing = true;
+
+    public void RenderToggle(bool render)
+    {
+        RenderPathtracing = render;
+    }
+    public static bool RenderPathtracingStatic = true;
+    private bool RenderDirty = false;
     private void Render(RenderTexture source, RenderTexture destination)
     {
         SetShaderParameters();
         // Make sure we have a current render target
         InitRenderTexture();
 
-        // Set the target and dispatch the compute shader
-        RayTracingShader.SetTexture(0, "Result", _target);
-        int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
-        int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
-        RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+        RenderPathtracingStatic = RenderPathtracing;
+        if(RenderPathtracing){
+            // Set the target and dispatch the compute shader
+            RayTracingShader.SetTexture(0, "Result", _target);
+            int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
+            int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
+            RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+        }else{
+            RenderDirty = true;
+            _currentSample = 0;
+            Graphics.Blit(source, destination);          
+            return;
+        }
 
         float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
             Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
@@ -519,7 +540,7 @@ public class RayTracingMaster : MonoBehaviour
         //     temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         // }
 
-        if(_renderTextureMat != null){            
+        if(_renderTextureMat != null){   
             _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
 
             // _converged.Release();
@@ -532,12 +553,17 @@ public class RayTracingMaster : MonoBehaviour
 
             
       
-            
-
-            Graphics.Blit(source, _converged);
-            Graphics.Blit(_converged, _target, _addMaterial);
+            // Graphics.Blit(source, _converged);
+            if(_currentSample>0){
+                 Graphics.Blit(source, _target, _addMaterial);
+            }
             _renderTextureMat.mainTexture = _target;
-            Graphics.Blit(_target, destination);              
+            Graphics.Blit(_target, destination);    
+
+            if(RenderDirty){
+                RenderDirty = false;  
+                return;    
+            }
         }
         else{
             Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);

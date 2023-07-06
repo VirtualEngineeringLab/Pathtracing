@@ -25,6 +25,8 @@ public class MoveCamera : MonoBehaviour {
         t = Camera.main.transform;
     }
 
+    bool deadframe = true;
+
     void Update()
     {        
         if(move){
@@ -44,13 +46,25 @@ public class MoveCamera : MonoBehaviour {
             {
                 transform.position -= t.forward * speed * Time.deltaTime;
             }
+            if (Keyboard.current[Key.DownArrow].IsPressed()||Keyboard.current[Key.E].IsPressed())
+            {
+                transform.position += t.up * speed * Time.deltaTime;
+            }
+            if (Keyboard.current[Key.DownArrow].IsPressed()||Keyboard.current[Key.Q].IsPressed())
+            {
+                transform.position -= t.up * speed * Time.deltaTime;
+            }
         }
         if (Input.GetMouseButton(1))
-        {
-            rotationX += Input.GetAxis("Mouse X") * sensX * Time.deltaTime;
-            rotationY += Input.GetAxis("Mouse Y") * sensY * Time.deltaTime;
+        {            
+            if(deadframe){deadframe=false;return;}
+
+            rotationX += Input.GetAxis("Mouse X")* sensX * Time.deltaTime;
+            rotationY += Input.GetAxis("Mouse Y")* sensY * Time.deltaTime;
             rotationY = Mathf.Clamp(rotationY, minY, maxY);
-            transform.localEulerAngles = new Vector3(-rotationY, rotationX, 0);
+            transform.eulerAngles = new Vector3(-rotationY, rotationX , 0);
+        }else{
+            deadframe = true;
         }
     }
 
