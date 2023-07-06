@@ -39,29 +39,51 @@ public class DepthCloudRenderer : MonoBehaviour
             _vFX.SetUInt(Shader.PropertyToID("Height"), (uint)_height);
             _vFX.SetUInt(Shader.PropertyToID("Width"), (uint)_width);
         }
+
+        Rasterize(ToTexture2D(_renderTextureMat.mainTexture));
+    }
+    public static Texture2D ToTexture2D(Texture texture)
+    {
+        return Texture2D.CreateExternalTexture(
+            texture.width,
+            texture.height,
+            TextureFormat.RGB24,
+            false, false,
+            texture.GetNativeTexturePtr());
     }
 
-    public void Rasterize(RenderTexture RenderImage){
-        _renderTexture = RenderImage;
-        particleCount = (int)(RenderImage.height*RenderImage.width);
+    public void Rasterize(Texture2D RenderImage){
+        var cam = Camera.main.transform;
+        // _renderTexture = RenderImage;
+        particleCount = 100;//(int)(RenderImage.height*RenderImage.width);
+        int count = 0;
+        Vector3[] positions = new Vector3[particleCount]; 
+        Color[] colors = new Color[particleCount];
+        for(int i = 0; i<RenderImage.height; i++){
+            for(int j = 0; j<RenderImage.width; j++){
+                positions[count] = cam.position + cam.forward+cam.right*0.01f*j+cam.forward+cam.up*0.01f*i;//RenderImage.GetPixel(i,j);
+                colors[count++] = RenderImage.GetPixel(i,j);
+            }
+        }
+        Rasterize(positions, colors);
         isDirty = true;
     }
     
     public void Rasterize(Vector3[] positions, Color[] colors) {
-        // _textureColor = new Texture2D(_width, _height);
-        // _textureScale = new Texture2D(_width, _height);
+        _textureColor = new Texture2D(_width, _height);
+        _textureScale = new Texture2D(_width, _height);
 
-        // for (int y = 0; y < _height; y++) {
-        //     for (int x = 0; x < _width; x++) {
-        //         int index = x + y * _height;
-        //         _textureColor.SetPixel(x, y, colors [index] ) ;
-        //         var data = new Color(positions[index].x, positions[index].y, positions[index].z, 1);
-        //         _textureScale.SetPixel(x, y, data);
-        //     }
+        for (int y = 0; y < _height; y++) {
+            for (int x = 0; x < _width; x++) {
+                int index = x + y * _height;
+                _textureColor.SetPixel(x, y, colors [index] ) ;
+                var data = new Color(positions[index].x, positions[index].y, positions[index].z, 1);
+                _textureScale.SetPixel(x, y, data);
+            }
             
-        // }
-        // _textureColor.Apply();
-        // _textureScale.Apply();
+        }
+        _textureColor.Apply();
+        _textureScale.Apply();
         particleCount = (int)positions.Length;
         isDirty = true;
     }
