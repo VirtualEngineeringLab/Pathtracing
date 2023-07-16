@@ -773,8 +773,8 @@ MonoBehaviour:
   maxX: 360
   minY: -45
   maxY: 45
-  sensX: 100
-  sensY: 100
+  sensX: 500
+  sensY: 500
   move: 1
 --- !u!1 &513501446
 GameObject:
