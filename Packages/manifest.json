@@ -2,6 +2,7 @@
   "dependencies": {
     "com.unity.ide.vscode": "1.2.5",
     "com.unity.render-pipelines.high-definition": "14.0.7",
+    "com.unity.rendering.denoising": "1.0.0",
     "com.unity.textmeshpro": "3.0.6",
     "com.unity.xr.management": "4.2.1",
     "com.unity.xr.openxr": "1.7.0",

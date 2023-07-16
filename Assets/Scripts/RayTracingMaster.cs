@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.XR;
 using Random = UnityEngine.Random;
+using UnityEngine.Rendering.Denoising;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -104,6 +106,7 @@ public class RayTracingMaster : MonoBehaviour
         _transformsToWatch.Add(transform);
         _transformsToWatch.Add(DirectionalLight.transform);
         thisCameraFOV = Camera.main.fieldOfView;
+
     }
 
     public void Reset()
@@ -120,6 +123,7 @@ public class RayTracingMaster : MonoBehaviour
 
         _currentSample = 0;
         SetUpScene();
+        StartCoroutine(ASyncRenderer());
     }
 
     private void OnDisable()
@@ -434,6 +438,8 @@ public class RayTracingMaster : MonoBehaviour
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
+        Graphics.Blit(source, destination);    
+        return;
         //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
         thisCameraRot = _camera.transform.rotation.eulerAngles;
         thisCameraPos = _camera.transform.position;
@@ -576,7 +582,12 @@ public class RayTracingMaster : MonoBehaviour
             _currentSample = actualSampleFrames;
     }
 
-    void LateUpdate(){
+    private bool isRendering = false;
+    private ComputeBuffer _computeBuffer;
+    
+    void RenderAsyncSync(){
+        // if(isRendering){return;}
+        // return;
         RebuildMeshObjectBuffers();        
 
         SetShaderParameters();
@@ -585,6 +596,8 @@ public class RayTracingMaster : MonoBehaviour
 
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing){
+            isRendering = true;
+            // RayTracingShader.SetBuffer(0, "Result", _computeBuffer);
             // Set the target and dispatch the compute shader
             RayTracingShader.SetTexture(0, "Result", _target);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
@@ -603,27 +616,94 @@ public class RayTracingMaster : MonoBehaviour
 
         actualSampleFrames = sampleFrames;
 
-        if(_renderTextureMat != null){   
-            // _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
-            // if(_currentSample>0){
-            //      Graphics.Blit(source, _target, _addMaterial);
-            // }
-            _renderTextureMat.mainTexture = _target;
-            // Graphics.Blit(_target, destination);    
-
-            if(RenderDirty){
-                RenderDirty = false;  
-                return;    
-            }
-        }
         // else{
         //     // Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         // }
 
 
-        if (_currentSample < actualSampleFrames)
-            _currentSample++;
-        else
-            _currentSample = actualSampleFrames;
+
+             // Create a new denoiser object
+        // var denoiser = new CommandBufferDenoiser();
+
+        // // Initialize the denoising state
+        // Denoiser.State result = denoiser.Init(DenoiserType.OpenImageDenoise, RenderWidth, RenderHight);
+        // // Assert.AreEqual(Denoiser.State.Success, result);
+
+        // // Create a new denoise request for a color image stored in a Render Texture
+        // denoiser.DenoiseRequest(cmd, "color", colorImage);
+
+        // // Wait until the denoising request is done executing
+        // result = denoiser.WaitForCompletion(renderContext, cmd);
+        // // Assert.AreEqual(Denoiser.State.Success, result);
+
+        // // Get the results
+        // var dst = new RenderTexture(colorImage.descriptor);
+        // result = denoiser.GetResults(cmd, dst);
+        // Assert.AreEqual(Denoiser.State.Success, result);
+
+        // // Create a new denoiser object
+        // var denoiser = new CommandBufferDenoiser();
+
+        // // Initialize the denoising state
+        // Denoiser.State result = denoiser.Init(DenoiserType.OpenImageDenoise, width, height);
+        // Assert.AreEqual(Denoiser.State.Success, result);
+
+        // // Create a new denoise request for a color image stored in a Render Texture
+        // denoiser.DenoiseRequest(cmd, "color", colorImage);
+
+        // // Use albedo AOV to improve results
+        // denoiser.DenoiseRequest(cmd, "albedo", albedoImage);
+
+        // // Check if the denoiser request is still executing
+        // if (denoiser.QueryCompletion() != Denoiser.State.Executing)
+        // {
+        //     // Get the results
+        //     var dst = new RenderTexture(colorImage.descriptor);
+        //     result = denoiser.GetResults(cmd, dst);
+        //     Assert.AreEqual(Denoiser.State.Success, result);
+        // }
+    }
+    public void FramerateToggle(string framerate)
+    {
+        frametimer = 1f/Int32.Parse(framerate);
+    }
+    public float frametimer = 0.05f;
+    private float timer = 0.05f;
+
+    public static bool resetPos = false;
+    IEnumerator ASyncRenderer()
+    {
+        while(true){
+            while((timer-=Time.deltaTime)>0){
+                yield return null;
+            }
+            resetPos = true;
+            yield return null;
+            timer = frametimer;            
+            
+            if(_renderTextureMat != null){   
+                // _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
+            
+                // _camera.targetTexture = _converged;
+                // _camera.Render();
+
+                // if(_currentSample>0){
+                //      Graphics.Blit(_converged, _target, _addMaterial);
+                // }
+                // Graphics.Blit(_target, _converged); 
+                _renderTextureMat.mainTexture = _target;            
+                // _camera.targetTexture = null;   
+                isRendering = false;
+
+                if(RenderDirty){
+                    RenderDirty = false;  
+                    yield return 0;
+                }
+            }
+
+            yield return null;
+            RenderAsyncSync();
+            
+        }
     }
 }

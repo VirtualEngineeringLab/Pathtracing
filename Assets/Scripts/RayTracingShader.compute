@@ -378,7 +378,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         Ray ray = CreateCameraRay(uv);
         RayHit hit = Trace(ray);
         float dis = hit.distance/128.0;
-        Result[id.xy] = float4(dis,dis,dis,1);
+        Result[id.xy] = float4(dis,dis,dis,hit.distance);
         return;
 	}
 
@@ -420,6 +420,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     Ray ray = CreateCameraRay(uv);
     RayHit hit = Trace(ray);
-    float dis = hit.distance*2.0f;
-    Result[id.xy] = float4(result, dis);   
+    float dis = hit.distance;
+    Result[id.xy] = float4(result, hit.distance);   
 }

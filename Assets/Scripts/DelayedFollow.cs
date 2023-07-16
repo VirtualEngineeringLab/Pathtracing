@@ -106,6 +106,22 @@ public class DelayedFollow : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if(RayTracingMaster.resetPos){
+            RayTracingMaster.resetPos = false;
+        }else{
+            if(_poseHistory.Count>0){
+                var temp = _poseHistory.Peek();
+                transform.position = temp.Item1;
+                transform.rotation = temp.Item2;
+            }
+            return;
+        }
+        Camera currentCamera = Camera.main;
+        // Matrix4x4 matrixCameraToWorld = currentCamera.cameraToWorldMatrix;
+        // Matrix4x4 matrixProjectionInverse = GL.GetGPUProjectionMatrix(currentCamera.projectionMatrix, false).inverse;
+        // Matrix4x4 matrixHClipToWorld = matrixCameraToWorld * matrixProjectionInverse;
+
+        // Shader.SetGlobalMatrix("_MatrixHClipToWorld", matrixHClipToWorld);
         if(!RayTracingMaster.RenderPathtracingStatic){return;}
         // Awake();
         // transform.position = _target.transform.position+_target.transform.forward*transform.localScale.z;
@@ -137,7 +153,7 @@ public class DelayedFollow : MonoBehaviour
         }
             
         _poseHistory.Enqueue((pos, rot));//_target.transform.rotation*Quaternion.Euler(0,angleOffset,0)));
-        if(_poseHistory.Count>_framesOfDelay){
+        while(_poseHistory.Count>_framesOfDelay){
             var temp = _poseHistory.Dequeue();
             transform.position = temp.Item1;
             transform.rotation = temp.Item2;
