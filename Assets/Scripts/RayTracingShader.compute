@@ -1,6 +1,7 @@
 ﻿#pragma kernel CSMain
 
 RWTexture2D<float4> Result;
+RWTexture2D<float4> Result1;
 
 float4x4 _CameraToWorld;
 float4x4 _CameraInverseProjection;
@@ -361,26 +362,40 @@ float3 Shade(inout Ray ray, RayHit hit)
 //-------------------------------------
 //- KERNEL
 
+int _Counter;
+int _Divisions;
 
 [numthreads(32,32,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-	float3 result = float3(0, 0, 0);	
-
-    float depth = 0.0;
-
-	
-	if (_Depth==1) {
+    float divider = 16.0;
+    if (_Depth==1) {
 		uint width, height;
         Result.GetDimensions(width, height);
         float2 uv = float2((id.xy) / float2(width, height) * 2.0f - 1.0f);
 
         Ray ray = CreateCameraRay(uv);
         RayHit hit = Trace(ray);
-        float dis = hit.distance/128.0;
-        Result[id.xy] = float4(dis,dis,dis,hit.distance);
+        float dis = hit.distance/divider;
+        Result[id.xy] = float4(dis,dis,dis,dis);
         return;
 	}
+
+    if(_Counter%_Divisions==0){
+        Result[id.xy] = Result1[id.xy];
+        // return;
+    }
+    
+    uint width, height;
+    Result.GetDimensions(width, height);
+    uint stripe = height/_Divisions;
+    if(id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1)){
+        return;
+    }
+	float3 result = float3(0, 0, 0);	
+
+    float depth = 0.0;
+
 
 
 
@@ -389,8 +404,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 	_Pixel = id.xy * 2;
 
     // Get the dimensions of the RenderTexture
-    uint width, height;
-    Result.GetDimensions(width, height);
+    // uint width, height;
+    // Result.GetDimensions(width, height);
 
     //id.y = height - id.y;
 
@@ -420,6 +435,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     Ray ray = CreateCameraRay(uv);
     RayHit hit = Trace(ray);
-    float dis = hit.distance;
-    Result[id.xy] = float4(result, hit.distance);   
+    float dis = hit.distance/divider;
+    Result1[id.xy] = float4(result, dis);
 }

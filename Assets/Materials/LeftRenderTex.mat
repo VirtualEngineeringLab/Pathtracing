@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: LeftRenderTex
-  m_Shader: {fileID: 4800000, guid: 514e755c7edf8a54b81ea4f9f2d26781, type: 3}
+  m_Shader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -89,7 +89,7 @@ Material:
     - _ColorMask: 15
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
-    - _Displacement: 0
+    - _Displacement: 0.557
     - _DstBlend: 0
     - _Exposure: 1
     - _GlossMapScale: 1

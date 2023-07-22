@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +6,10 @@ using UnityEngine;
 using UnityEngine.XR;
 using Random = UnityEngine.Random;
 using UnityEngine.Rendering.Denoising;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using UnityEngine.Rendering;
+using UnityEngine.UI;
+using UnityEngine.Events;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -72,6 +76,9 @@ public class RayTracingMaster : MonoBehaviour
     public int RenderHight;
     public int RenderWidth;
 
+    public Text ReproPerf;
+    public Text RenderPerf;
+
     struct MeshObject
     {
         public Matrix4x4 localToWorldMatrix;
@@ -128,6 +135,7 @@ public class RayTracingMaster : MonoBehaviour
 
     private void OnDisable()
     {
+        StopAllCoroutines();
         _sphereBuffer?.Release();
         _meshObjectBuffer?.Release();
         _vertexBuffer?.Release();
@@ -391,6 +399,8 @@ public class RayTracingMaster : MonoBehaviour
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
+                            
+            _renderTextureMat.mainTexture = _target;  
 
             // Reset sampling
             //_currentSample = 0;
@@ -434,6 +444,24 @@ public class RayTracingMaster : MonoBehaviour
         }
         RenderTexture.ReleaseTemporary(blit);
         return result; //return the last partial result
+    }
+
+    public class PathtracingPipeline : RenderPipeline
+    {
+        public PathtracingPipeline() {
+        }
+
+        protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
+            // Create and schedule a command to clear the current render target
+            var cmd = new CommandBuffer();
+            cmd.ClearRenderTarget(true, true, Color.red);
+            context.ExecuteCommandBuffer(cmd);
+            cmd.Release();
+
+            
+            // Tell the Scriptable Render Context to tell the graphics API to perform the scheduled commands
+            context.Submit();
+        }
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
@@ -491,19 +519,28 @@ public class RayTracingMaster : MonoBehaviour
     }
     public static bool RenderPathtracingStatic = true;
     private bool RenderDirty = false;
+    int divisions = 10;
+    int counter = 0;
     private void Render(RenderTexture source, RenderTexture destination)
     {
-        SetShaderParameters();
-        // Make sure we have a current render target
-        InitRenderTexture();
+        // if(counter%10==0){
+        //     SetShaderParameters();
+        //     // Make sure we have a current render target
+        //     InitRenderTexture();
+        // }
 
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing){
             // Set the target and dispatch the compute shader
+            RayTracingShader.SetInt("_Counter", counter++%divisions);
+
             RayTracingShader.SetTexture(0, "Result", _target);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+            // if(counter%10!=0){
+            //     return;
+            // }
         }else{
             RenderDirty = true;
             _currentSample = 0;
@@ -560,10 +597,10 @@ public class RayTracingMaster : MonoBehaviour
             
       
             // Graphics.Blit(source, _converged);
-            if(_currentSample>0){
-                 Graphics.Blit(source, _target, _addMaterial);
-            }
-            _renderTextureMat.mainTexture = _target;
+            // if(_currentSample>0){
+            //      Graphics.Blit(source, _target, _addMaterial);
+            // }
+            // _renderTextureMat.mainTexture = _target;
             Graphics.Blit(_target, destination);    
 
             if(RenderDirty){
@@ -583,31 +620,53 @@ public class RayTracingMaster : MonoBehaviour
     }
 
     private bool isRendering = false;
-    private ComputeBuffer _computeBuffer;
+
+    private float renderTimer = 0f;
+
+    // public int resetnum = 0;
     
     void RenderAsyncSync(){
-        // if(isRendering){return;}
-        // return;
-        RebuildMeshObjectBuffers();        
+        // if(counter%divisions==divisions-2){
+        //     resetPos = true;
+        // }
 
-        SetShaderParameters();
-        // Make sure we have a current render target
-        InitRenderTexture();
+        if(counter%divisions==0 || depth){
+            DelayedFollow.reprojectionUpdate.Invoke();
+            ReproPerf.text = $"{Time.deltaTime*1000f}";
+            RenderPerf.text = $"{renderTimer*1000f}";
+            renderTimer = 0;
+            RebuildMeshObjectBuffers();        
 
+            SetShaderParameters();
+            // Make sure we have a current render target
+            InitRenderTexture();
+        }
+        
+        renderTimer += Time.deltaTime;
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing){
             isRendering = true;
             // RayTracingShader.SetBuffer(0, "Result", _computeBuffer);
             // Set the target and dispatch the compute shader
+            // AsyncGPUReadback.Request(_target, );
+            RayTracingShader.SetInt("_Divisions", divisions);
+            RayTracingShader.SetInt("_Counter", counter++%divisions);
+            
+
             RayTracingShader.SetTexture(0, "Result", _target);
+            RayTracingShader.SetTexture(0, "Result1", _converged);
+
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+            if(counter%10!=0){
+                // return;
+            }
         }else{
             RenderDirty = true;
             _currentSample = 0;
             // Graphics.Blit(source, destination);          
-            return;
+            // return;
         }
 
         float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
@@ -621,88 +680,109 @@ public class RayTracingMaster : MonoBehaviour
         // }
 
 
-
-             // Create a new denoiser object
-        // var denoiser = new CommandBufferDenoiser();
+        // var rgc = new RenderGraphContext();
+        // var cmd = new CommandBuffer();
+        // //  Create a new denoiser object
+        // CommandBufferDenoiser denoiser = new CommandBufferDenoiser();
 
         // // Initialize the denoising state
-        // Denoiser.State result = denoiser.Init(DenoiserType.OpenImageDenoise, RenderWidth, RenderHight);
+        // Denoiser.State result = denoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
         // // Assert.AreEqual(Denoiser.State.Success, result);
 
         // // Create a new denoise request for a color image stored in a Render Texture
-        // denoiser.DenoiseRequest(cmd, "color", colorImage);
+        // denoiser.DenoiseRequest(cmd, "color", _target);
+
+        // // var src = new ScriptableRenderContext();
 
         // // Wait until the denoising request is done executing
-        // result = denoiser.WaitForCompletion(renderContext, cmd);
+        // // result = denoiser.WaitForCompletion(src, cmd);
         // // Assert.AreEqual(Denoiser.State.Success, result);
 
         // // Get the results
-        // var dst = new RenderTexture(colorImage.descriptor);
-        // result = denoiser.GetResults(cmd, dst);
-        // Assert.AreEqual(Denoiser.State.Success, result);
+        // // var dst = new RenderTexture(colorImage.descriptor);
+        // // var dst = new RenderTexture(_target.descriptor);
+
+        // result = denoiser.GetResults(cmd, _target);
+        // // Assert.AreEqual(Denoiser.State.Success, result);
+
+
+        // var cmd = new CommandBuffer();
+        
 
         // // Create a new denoiser object
-        // var denoiser = new CommandBufferDenoiser();
+        // CommandBufferDenoiser denoiser = new CommandBufferDenoiser();
 
         // // Initialize the denoising state
-        // Denoiser.State result = denoiser.Init(DenoiserType.OpenImageDenoise, width, height);
-        // Assert.AreEqual(Denoiser.State.Success, result);
+        // Denoiser.State result = denoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
+        // // Assert.AreEqual(Denoiser.State.Success, result);
 
         // // Create a new denoise request for a color image stored in a Render Texture
-        // denoiser.DenoiseRequest(cmd, "color", colorImage);
+        // denoiser.DenoiseRequest(cmd, "color", _target);
 
-        // // Use albedo AOV to improve results
-        // denoiser.DenoiseRequest(cmd, "albedo", albedoImage);
+        // // // Use albedo AOV to improve results
+        // denoiser.DenoiseRequest(cmd, "albedo", _target);
 
         // // Check if the denoiser request is still executing
-        // if (denoiser.QueryCompletion() != Denoiser.State.Executing)
+        // while (denoiser.QueryCompletion() != Denoiser.State.Executing)
         // {
-        //     // Get the results
-        //     var dst = new RenderTexture(colorImage.descriptor);
-        //     result = denoiser.GetResults(cmd, dst);
-        //     Assert.AreEqual(Denoiser.State.Success, result);
+        //    yield return null;
         // }
+        
+        // // Get the results
+        // var dst = new RenderTexture(_target.descriptor);
+        // result = denoiser.GetResults(cmd, dst);
+        // Graphics.Blit(dst, _target);
+        // // Assert.AreEqual(Denoiser.State.Success, result);
+        // print("success denoising");
+        isRendering = false;
+
+        if(RenderDirty){
+            RenderDirty = false;  
+        }        
     }
     public void FramerateToggle(string framerate)
     {
-        frametimer = 1f/Int32.Parse(framerate);
+        divisions = Int32.Parse(framerate);
+        // frametimer = 1f/Int32.Parse(framerate);
     }
     public float frametimer = 0.05f;
     private float timer = 0.05f;
 
     public static bool resetPos = false;
+    [SerializeField] private Material depthMat;
     IEnumerator ASyncRenderer()
     {
         while(true){
-            while((timer-=Time.deltaTime)>0){
-                yield return null;
-            }
-            resetPos = true;
-            yield return null;
-            timer = frametimer;            
+            // while((timer-=Time.deltaTime)>0 || isRendering){
+            //     yield return null;
+                
+            // }
+            // yield return null;
+            // timer = frametimer;            
             
-            if(_renderTextureMat != null){   
-                // _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
+            // if(_renderTextureMat != null){   
+            //     // _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
             
-                // _camera.targetTexture = _converged;
-                // _camera.Render();
+            //     // _camera.targetTexture = _converged;
+            //     // _camera.Render();
 
-                // if(_currentSample>0){
-                //      Graphics.Blit(_converged, _target, _addMaterial);
-                // }
-                // Graphics.Blit(_target, _converged); 
-                _renderTextureMat.mainTexture = _target;            
-                // _camera.targetTexture = null;   
-                isRendering = false;
+            //     // if(_currentSample>0){
+            //     //      Graphics.Blit(_converged, _target, _addMaterial);
+            //     // }
+            //     // Graphics.Blit(_target, _converged); 
+            //     // var viewMatrix = _camera.worldToCameraMatrix;
+            //     // var projectionMatrix = _camera.projectionMatrix;
+            //     // projectionMatrix = GL.GetGPUProjectionMatrix(projectionMatrix, false);
+            //     // var clipToPos = (projectionMatrix * viewMatrix).inverse;
+            //     // depthMat.SetMatrix("clipToWorld", clipToPos);
 
-                if(RenderDirty){
-                    RenderDirty = false;  
-                    yield return 0;
-                }
-            }
-
+  
+            //     // _camera.targetTexture = null;   
+                
+            // }
             yield return null;
             RenderAsyncSync();
+            // StartCoroutine(RenderAsyncSync());
             
         }
     }
