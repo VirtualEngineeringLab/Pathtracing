@@ -149,6 +149,10 @@ Shader "VertexDisplacement"
             // o.posWorld = mul(unity_ObjectToWorld, v.vertex);
             // float3 dir = mul(unity_CameraProjection,o.pos);
             // o.posWorld += dir * d * _Displacement;
+
+            // o.vertex = mul (UNITY_MATRIX_MVP, v.vertex);       
+            // o.screenPos = ComputeScreenPos(o.vertex);
+
             v.vertex = mul(unity_WorldToObject, worldspace);
             // float3 viewpos = UnityObjectToViewPos(v.vertex);
             o.pos = UnityObjectToClipPos(worldspace);

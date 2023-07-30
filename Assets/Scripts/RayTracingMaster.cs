@@ -10,6 +10,11 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine.Experimental.Rendering;
+using System.Threading;
+using System.Runtime.InteropServices;
+using Unity.Collections;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -362,7 +367,9 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrix("_CameraInverseProjection", pMatrix);
         }else
         {
+            RayTracingShader.SetMatrix("_WorldToCamera", _camera.worldToCameraMatrix);
             RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
+            RayTracingShader.SetMatrix("_CameraProjection", _camera.projectionMatrix);
             RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         }
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
@@ -624,14 +631,24 @@ public class RayTracingMaster : MonoBehaviour
     private float renderTimer = 0f;
 
     // public int resetnum = 0;
-    
+    public enum RenderMode{
+        Default = 0,
+        Depth = 1,
+        Reproj = 2
+    }
+    public RenderMode renderMode = RenderMode.Default;
+    NativeArray<Vector4> dst;
+    Texture2D cpuTexture;
+    Denoiser denoiser;
+
     void RenderAsyncSync(){
         // if(counter%divisions==divisions-2){
         //     resetPos = true;
         // }
 
-        if(counter%divisions==0 || depth){
-            DelayedFollow.reprojectionUpdate.Invoke();
+        if(counter%divisions==0 || depth)
+        {
+            DelayedFollow.reprojectionUpdate?.Invoke();
             ReproPerf.text = $"{Time.deltaTime*1000f}";
             RenderPerf.text = $"{renderTimer*1000f}";
             renderTimer = 0;
@@ -649,6 +666,7 @@ public class RayTracingMaster : MonoBehaviour
             // RayTracingShader.SetBuffer(0, "Result", _computeBuffer);
             // Set the target and dispatch the compute shader
             // AsyncGPUReadback.Request(_target, );
+            RayTracingShader.SetInt("renderMode", (int)renderMode);
             RayTracingShader.SetInt("_Divisions", divisions);
             RayTracingShader.SetInt("_Counter", counter++%divisions);
             
@@ -659,9 +677,9 @@ public class RayTracingMaster : MonoBehaviour
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
-            if(counter%10!=0){
-                // return;
-            }
+            // if(counter%10!=0){
+            //     return;
+            // }
         }else{
             RenderDirty = true;
             _currentSample = 0;
@@ -678,6 +696,77 @@ public class RayTracingMaster : MonoBehaviour
         // else{
         //     // Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         // }
+        
+        if(false){
+        unsafe{
+            Debug.LogError("Denoising");
+            Denoiser.State result;
+            if(denoiser == null){
+                // Create a new denoiser object
+                denoiser = new Denoiser();
+
+                // Initialize the denoising state
+                result = denoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
+            }
+            // Assert.AreEqual(Denoiser.State.Success, result);
+            if(dst == null || dst.Length != RenderWidth * RenderHight*4){
+                dst = new NativeArray<Vector4>(RenderWidth * RenderHight*4, Allocator.Temp);
+            }
+            if(cpuTexture== null || cpuTexture.width != RenderWidth){
+                cpuTexture = new Texture2D(RenderWidth, RenderHight,TextureFormat.RGBAFloat, 1, false);
+            }
+            // dst.Copy(_target.colorBuffer);
+            // byte* ptr = (byte*)_target.colorBuffer.GetNativeRenderBufferPtr().ToPointer();
+            // byte[] temp = new byte[RenderWidth * RenderHight*4];
+            // Marshal.Copy(_target.colorBuffer.GetNativeRenderBufferPtr(), temp, 0, RenderWidth * RenderHight*4);
+            // Marshal.Copy(temp, 0,(IntPtr)NativeArrayUnsafeUtility.GetUnsafePtr(dst), RenderWidth * RenderHight*4);
+
+            // NativeArray<Vector4> src = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<Vector4>(
+            //     _target.colorBuffer.GetNativeRenderBufferPtr().ToPointer()
+            //     ,RenderWidth * RenderHight*4, Allocator.Persistent
+            // );
+            
+            // AsyncGPUReadback.RequestIntoNativeArray(ref dst, _target, Denoise);
+            
+            // Buffer.MemoryCopy(_target.colorBuffer.GetNativeRenderBufferPtr().ToPointer(),NativeArrayUnsafeUtility.GetUnsafePtr(dst),RenderWidth * RenderHight*4,RenderWidth * RenderHight*4);
+            // Buffer.MemoryCopy(temp.GetNativeTexturePtr().ToPointer(),NativeArrayUnsafeUtility.GetUnsafePtr(dst),RenderWidth * RenderHight*4,RenderWidth * RenderHight*4);
+            // dst.CopyFrom(temp.GetNativeTexturePtr().ToPointer());
+            
+            // dst = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<Vector4>(
+            //     temp.GetNativeTexturePtr().ToPointer()
+            //     ,RenderWidth * RenderHight*4, Allocator.Temp
+            // );
+
+            RenderTexture.active =_target;
+            Graphics.CopyTexture(_target, cpuTexture);
+            cpuTexture.ReadPixels(new Rect(0, 0, RenderWidth, RenderHight), 0, 0);
+            cpuTexture.Apply();
+            RenderTexture.active = null;   
+            // _target.Release();
+            dst = cpuTexture.GetRawTextureData<Vector4>();
+            // Destroy(temp);
+
+
+            // Create a new denoise request for a colorImage on a native array
+            result = denoiser.DenoiseRequest("color", dst);
+            // Assert.AreEqual(Denoiser.State.Success, result);
+            print("denoising request");
+
+            // Get the results
+            try{
+                result = denoiser.GetResults(dst);
+                Debug.LogError(result);
+                cpuTexture.SetPixelData<Vector4>(dst, 0, 0);
+                cpuTexture.Apply();
+                Graphics.CopyTexture(cpuTexture, _target);
+                Debug.LogError("copy denoising");
+
+            }catch(Exception e){
+                Debug.LogError(e);
+            }
+            // print("success denoising");
+            // Assert.AreEqual(Denoiser.State.Success, result);
+        }}
 
 
         // var rgc = new RenderGraphContext();
@@ -720,7 +809,7 @@ public class RayTracingMaster : MonoBehaviour
         // denoiser.DenoiseRequest(cmd, "color", _target);
 
         // // // Use albedo AOV to improve results
-        // denoiser.DenoiseRequest(cmd, "albedo", _target);
+        //// denoiser.DenoiseRequest(cmd, "albedo", _target);
 
         // // Check if the denoiser request is still executing
         // while (denoiser.QueryCompletion() != Denoiser.State.Executing)
@@ -781,6 +870,11 @@ public class RayTracingMaster : MonoBehaviour
                 
             // }
             yield return null;
+            
+            while(isRendering){
+                yield return null;
+            }
+            isRendering = true;
             RenderAsyncSync();
             // StartCoroutine(RenderAsyncSync());
             
