@@ -1229,6 +1229,7 @@ MonoBehaviour:
   imageBlur: 0
   depth: 0
   RenderPathtracing: 1
+  renderMode: 0
   frametimer: 0.05
   depthMat: {fileID: 0}
 --- !u!114 &687178266
@@ -1843,6 +1844,7 @@ MonoBehaviour:
   imageBlur: 0
   depth: 0
   RenderPathtracing: 1
+  renderMode: 0
   frametimer: 0.01
   depthMat: {fileID: 2100000, guid: 3ba5dc023251ebe4d8b20a3289c343f0, type: 2}
 --- !u!114 &1053208581
@@ -1907,7 +1909,7 @@ Camera:
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
   m_TargetEye: 1
-  m_HDR: 1
+  m_HDR: 0
   m_AllowMSAA: 0
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0

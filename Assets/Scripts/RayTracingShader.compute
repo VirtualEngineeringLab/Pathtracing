@@ -5,7 +5,9 @@ RWTexture2D<float4> Result1;
 
 float4x4 _CameraToWorld;
 float4x4 _WorldToCamera;
+float4x4 _WorldToCameraOld;
 float4x4 _CameraProjection;
+float4x4 _CameraProjectionOld;
 float4x4 _CameraInverseProjection;
 
 float4 _DirectionalLight;
@@ -416,17 +418,20 @@ float2 FindCameraRay(Ray input)
     // uv.x = (toCam.x + width / 2)/width;
     // uv.y = (toCam.y + height / 2)/height;
     // return uv;
+    uint pwidth, pheight;
+    Result.GetDimensions(pwidth, pheight);
+    // float2 demensions = float2(pwidth, pheight);
 
     pos = normalize(input.direction)*(0.03 + (1000.0 - 0.03));
-    float ratio = 3840.0 / 2160.0;
+    float ratio = pwidth / pheight;
     float2 uv =0;
-    float3 toCam = mul(_WorldToCamera, pos);
+    float3 toCam = mul(_WorldToCameraOld, pos);
     float camPosZ = toCam.z;
-    float height =  camPosZ / _CameraProjection._m11;
+    float height =  camPosZ / _CameraProjectionOld._m11;
     float width =  (ratio)  * height;
-    uv.x = (toCam.x - width)/width;
+    uv.x = (toCam.x - width*(16.0/9.0))/width;
     uv.y = (toCam.y - height)/height;
-    return 1.0-uv*float2(1080.0*ratio, 1080.0);
+    return 1.0-uv*float2(pheight*ratio/2.0, pheight/2.0);
 }
 
 
@@ -453,7 +458,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         return;
 	}
 
-    if(_Counter%_Divisions==0 && renderMode ==0)
+    if(_Counter%_Divisions==0 && renderMode == 0)
     {
         Result[id.xy] = Result1[id.xy];
         return;
@@ -461,10 +466,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     
     uint width, height;
     Result.GetDimensions(width, height);
-    uint stripe = height/_Divisions;
-    if(id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1)){
-        return;
-    }
+    // uint stripe = height/_Divisions;
+    // if(id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1)){
+    //     return;
+    // }
 	float3 result = float3(0, 0, 0);	
 
     float depth = 0.0;
@@ -513,8 +518,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             Result1[id.xy] = float4(result, 1.0);
 
             float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-            // float2 reproUV = FindCameraRay(CreateRay(origin,hitPos-origin));
-            float2 reproUV = FindCameraRay(CreateCameraRay(uv));
+            float2 reproUV = FindCameraRay(CreateRay(origin,hitPos-origin));
+            // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
 
             Result[id.xy] = Result1[reproUV];
             return;

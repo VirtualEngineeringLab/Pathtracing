@@ -353,6 +353,8 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetBuffer(0, name, buffer);
         }
     }
+    private Matrix4x4 oldCTW;
+    private Matrix4x4 oldPRJ;
 
     private void SetShaderParameters()
     {
@@ -367,10 +369,15 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrix("_CameraInverseProjection", pMatrix);
         }else
         {
-            RayTracingShader.SetMatrix("_WorldToCamera", _camera.worldToCameraMatrix);
-            RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
-            RayTracingShader.SetMatrix("_CameraProjection", _camera.projectionMatrix);
+           
+            
+            RayTracingShader.SetMatrix("_CameraToWorldOld", _camera.cameraToWorldMatrix);            
             RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
+
+            RayTracingShader.SetMatrix("_WorldToCamera", oldCTW);
+            RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
+            oldCTW = _camera.worldToCameraMatrix;
+            oldPRJ = _camera.projectionMatrix;
         }
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
         RayTracingShader.SetFloat("_Seed", Random.value);
@@ -668,7 +675,7 @@ public class RayTracingMaster : MonoBehaviour
             // AsyncGPUReadback.Request(_target, );
             RayTracingShader.SetInt("renderMode", (int)renderMode);
             RayTracingShader.SetInt("_Divisions", divisions);
-            RayTracingShader.SetInt("_Counter", counter++%divisions);
+            RayTracingShader.SetInt("_Counter", counter%divisions);
             
 
             RayTracingShader.SetTexture(0, "Result", _target);
@@ -677,7 +684,7 @@ public class RayTracingMaster : MonoBehaviour
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
-            // if(counter%10!=0){
+            // if(counter%divisions!=0){
             //     return;
             // }
         }else{
@@ -697,24 +704,27 @@ public class RayTracingMaster : MonoBehaviour
         //     // Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         // }
         
-        if(false){
+        if(false && counter%divisions==0 && RenderPathtracing){
         unsafe{
             Debug.LogError("Denoising");
             Denoiser.State result;
-            if(denoiser == null){
+            if(denoiser == null
+            || dst == null || dst.Length != RenderWidth * RenderHight*4
+            || cpuTexture== null || cpuTexture.width != RenderWidth)
+            {
+                denoiser?.DisposeDenoiser();
                 // Create a new denoiser object
                 denoiser = new Denoiser();
 
                 // Initialize the denoising state
                 result = denoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
-            }
-            // Assert.AreEqual(Denoiser.State.Success, result);
-            if(dst == null || dst.Length != RenderWidth * RenderHight*4){
                 dst = new NativeArray<Vector4>(RenderWidth * RenderHight*4, Allocator.Temp);
-            }
-            if(cpuTexture== null || cpuTexture.width != RenderWidth){
+            
                 cpuTexture = new Texture2D(RenderWidth, RenderHight,TextureFormat.RGBAFloat, 1, false);
             }
+            // Assert.AreEqual(Denoiser.State.Success, result);
+            
+
             // dst.Copy(_target.colorBuffer);
             // byte* ptr = (byte*)_target.colorBuffer.GetNativeRenderBufferPtr().ToPointer();
             // byte[] temp = new byte[RenderWidth * RenderHight*4];
@@ -740,11 +750,12 @@ public class RayTracingMaster : MonoBehaviour
             RenderTexture.active =_target;
             Graphics.CopyTexture(_target, cpuTexture);
             cpuTexture.ReadPixels(new Rect(0, 0, RenderWidth, RenderHight), 0, 0);
-            cpuTexture.Apply();
+            
             RenderTexture.active = null;   
             // _target.Release();
+            
             dst = cpuTexture.GetRawTextureData<Vector4>();
-            // Destroy(temp);
+            Destroy(cpuTexture);
 
 
             // Create a new denoise request for a colorImage on a native array
@@ -823,6 +834,7 @@ public class RayTracingMaster : MonoBehaviour
         // Graphics.Blit(dst, _target);
         // // Assert.AreEqual(Denoiser.State.Success, result);
         // print("success denoising");
+        counter++;
         isRendering = false;
 
         if(RenderDirty){
