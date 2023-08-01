@@ -17,6 +17,8 @@ using System.Runtime.InteropServices;
 using Unity.Collections;
 using UnityEngine.Rendering.HighDefinition;
 
+using UnityEngine.XR.Management;
+
 public class RayTracingMaster : MonoBehaviour
 {
     public ComputeShader RayTracingShader;
@@ -103,6 +105,8 @@ public class RayTracingMaster : MonoBehaviour
         public Vector3 emission;
     }
 
+    private static GameObject otherEye;
+
     private void Awake()
     {
         
@@ -112,6 +116,7 @@ public class RayTracingMaster : MonoBehaviour
         _projector = GetComponent<Projector>();
         if (!XRSettings.enabled && _camera != Camera.main)
         {
+            otherEye ??= gameObject;
             gameObject.SetActive(false);
         }
 
@@ -152,10 +157,22 @@ public class RayTracingMaster : MonoBehaviour
         _vertexBuffer?.Release();
         _indexBuffer?.Release();
     }
+    static bool xrEnabled = false;
   
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1))
+        if (Input.GetKeyDown(KeyCode.BackQuote) && gameObject != otherEye)
+        {
+            xrEnabled = !xrEnabled;
+            
+            if(xrEnabled){
+                StartCoroutine(StartXRCoroutine());
+            }else{
+                StartCoroutine(StopXR());
+            }
+            
+            otherEye?.SetActive(true);
+        }else if (Input.GetKeyDown(KeyCode.F1))
         {
             renderMode = RenderMode.Default;
         }else if (Input.GetKeyDown(KeyCode.F2))
@@ -164,6 +181,9 @@ public class RayTracingMaster : MonoBehaviour
         }else if (Input.GetKeyDown(KeyCode.F3))
         {
             renderMode = RenderMode.BlurAndReproj;
+        }else if (Input.GetKeyDown(KeyCode.F4))
+        {
+            renderMode = RenderMode.StereoReproj;
         }else if (Input.GetKeyDown(KeyCode.F10))
         {
             renderMode = RenderMode.NewRender;
@@ -174,7 +194,7 @@ public class RayTracingMaster : MonoBehaviour
         {
             renderMode = RenderMode.PlanerPause;
         }
-
+        
         // this example shows the different camera frustums when using asymmetric projection matrices (like those used by OpenVR).
 
         // var camera = GetComponent<Camera>();
@@ -224,6 +244,37 @@ public class RayTracingMaster : MonoBehaviour
             }
         }
     }
+
+    public IEnumerator StartXRCoroutine()
+    {
+        Debug.Log("Initializing XR...");
+        yield return XRGeneralSettings.Instance.Manager.InitializeLoader();
+
+        if (XRGeneralSettings.Instance.Manager.activeLoader == null)
+        {
+            Debug.LogError("Initializing XR Failed. Check Editor or Player log for details.");
+        }
+        else
+        {
+            Debug.Log("Starting XR...");
+            XRGeneralSettings.Instance.Manager.StartSubsystems();
+        }
+        renderMode = RenderMode.StereoReproj;
+    }
+    IEnumerator StopXR()
+    {
+        Debug.Log("Stopping XR...");
+
+        XRGeneralSettings.Instance.Manager.StopSubsystems();
+        XRGeneralSettings.Instance.Manager.DeinitializeLoader();
+        Debug.Log("XR stopped completely.");
+        yield return null;
+        
+        otherEye.SetActive(false);
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
+        renderMode = RenderMode.Reproj;
+    }    
 
     public static int RegisterObject(RayTracingObject obj)
     {
@@ -390,11 +441,22 @@ public class RayTracingMaster : MonoBehaviour
         
         if(_camera.stereoEnabled){
             bool left = _camera.stereoTargetEye == StereoTargetEyeMask.Left;
+            left = !left;
+            RayTracingShader.SetBool("_leftEye",left);
             var vMatrix = _camera.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right).inverse;
             RayTracingShader.SetMatrix("_CameraToWorld", vMatrix);
 
             var pMatrix = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right).inverse;
             RayTracingShader.SetMatrix("_CameraInverseProjection", pMatrix);
+
+            RayTracingShader.SetMatrix("_CameraInverseProjectionOld",oldIPR);
+            RayTracingShader.SetMatrix("_CameraToWorldOld", oldCTW);
+            RayTracingShader.SetMatrix("_WorldToCameraOld", oldWTC);
+            RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
+            oldIPR = pMatrix;
+            oldCTW = vMatrix;
+            oldWTC = _camera.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
+            oldPRJ = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
         }else
         {           
             
@@ -433,6 +495,10 @@ public class RayTracingMaster : MonoBehaviour
             {
                 _target.Release();
                 _converged.Release();
+            }
+
+            if(RenderWidth == 0 ||  RenderHight == 0){
+                return;
             }
 
             // Get a render target for Ray Tracing
@@ -590,7 +656,7 @@ public class RayTracingMaster : MonoBehaviour
         InitRenderTexture();
 
         RenderPathtracingStatic = RenderPathtracing;
-        if(RenderPathtracing){
+        if(RenderPathtracing && _target != null && RenderWidth>0 && RenderHight>0){
             ReproPerf.text = "";
             RenderPerf.text = $"{renderTimer*1000f}";
             // Set the target and dispatch the compute shader
@@ -613,7 +679,11 @@ public class RayTracingMaster : MonoBehaviour
             Graphics.Blit(source, destination);          
             return;
         }
-        Graphics.Blit(_target, destination);    
+        if(xrEnabled){
+            Graphics.Blit(_target, destination, shiftMat);    
+        }else{
+            Graphics.Blit(_target, destination);    
+        }
 
         // float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
         //     Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
@@ -823,11 +893,12 @@ public class RayTracingMaster : MonoBehaviour
         Default = 1,
         Reproj = 2,
         BlurAndReproj = 3,
+        StereoReproj = 4,
         NewRender = 10,
         DepthPause = 11,
         PlanerPause = 12,
     }
-    public RenderMode renderMode = RenderMode.Default;
+    public static RenderMode renderMode = RenderMode.Default;
     NativeArray<Vector4> dst;
     Texture2D cpuTexture;
     Denoiser denoiser;

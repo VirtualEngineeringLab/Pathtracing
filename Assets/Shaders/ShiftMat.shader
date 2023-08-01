@@ -47,8 +47,8 @@
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
-				o.uv.x = v.uv.x + _xOffset;
-				o.uv.y = v.uv.y + _yOffset;
+				o.uv.x = 1.0-v.uv.x ;//+ _xOffset
+				o.uv.y = 1.0-v.uv.y ;//+ _yOffset
 				//o.uv = v.uv;
 
 				//float x1 = 0, x2 = 1, x3 = 1, x4 = 0;
@@ -105,15 +105,15 @@
 
 
 
-				o.uv -= 0.5;
-				float s = sin(_zOffset);
-				float c = cos(_zOffset);
-				float2x2 rotationMatrix = float2x2(c, -s, s, c);
-				rotationMatrix *= 0.5;
-				rotationMatrix += 0.5;
-				rotationMatrix = rotationMatrix * 2 - 1;
-				o.uv = mul(o.uv, rotationMatrix);
-				o.uv += 0.5;
+				// o.uv -= 0.5;
+				// float s = sin(_zOffset);
+				// float c = cos(_zOffset);
+				// float2x2 rotationMatrix = float2x2(c, -s, s, c);
+				// rotationMatrix *= 0.5;
+				// rotationMatrix += 0.5;
+				// rotationMatrix = rotationMatrix * 2 - 1;
+				// o.uv = mul(o.uv, rotationMatrix);
+				// o.uv += 0.5;
 				return o;
 			}
 			

@@ -1180,7 +1180,7 @@ Transform:
   m_GameObject: {fileID: 687178263}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: -1, y: -1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 981445441}
@@ -1231,7 +1231,6 @@ MonoBehaviour:
   depth: 0
   RenderPathtracing: 1
   planerReproject: 0
-  renderMode: 0
   frametimer: 0.05
   depthMat: {fileID: 0}
 --- !u!114 &687178266
@@ -1261,7 +1260,7 @@ Camera:
   m_GameObject: {fileID: 687178263}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 2
+  m_ClearFlags: 3
   m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
@@ -1285,7 +1284,7 @@ Camera:
     height: 1
   near clip plane: 0.1
   far clip plane: 100
-  field of view: 60
+  field of view: 120
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -1797,7 +1796,7 @@ Transform:
   m_GameObject: {fileID: 1053208578}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: -1, y: -1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 441443189}
@@ -1848,7 +1847,6 @@ MonoBehaviour:
   depth: 0
   RenderPathtracing: 1
   planerReproject: 0
-  renderMode: 2
   frametimer: 0.01
   depthMat: {fileID: 2100000, guid: 3ba5dc023251ebe4d8b20a3289c343f0, type: 2}
 --- !u!114 &1053208581
@@ -2067,7 +2065,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1108984172
 Transform:
   m_ObjectHideFlags: 0

@@ -62,6 +62,8 @@ public class MoveCamera : MonoBehaviour {
             rotationX += Input.GetAxis("Mouse X")* sensX * Time.deltaTime;
             rotationY += Input.GetAxis("Mouse Y")* sensY * Time.deltaTime;
             rotationY = Mathf.Clamp(rotationY, minY, maxY);
+            Vector3 cross = Vector3.Cross(t.forward, transform.forward);
+            Vector3 crossO = Vector3.Cross(transform.forward, t.forward);
             transform.eulerAngles = new Vector3(-rotationY, rotationX , 0);
         }else{
             deadframe = true;

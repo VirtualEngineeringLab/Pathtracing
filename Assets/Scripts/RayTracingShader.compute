@@ -402,6 +402,29 @@ float2 FindCameraRay(Ray input)
     uv.y = (toCam.y - height)/height;
     return (1.0-uv*float2(pheight*ratio/2.0f, pheight/2.0f))-0.5f;
 }
+bool _leftEye;
+float2 FindCameraRayVR(Ray input)
+{
+    float3 pos = input.origin + input.direction;
+    
+   
+    uint pwidth, pheight;
+    Result.GetDimensions(pwidth, pheight);
+    // float2 demensions = float2(pwidth, pheight);
+    float near = -_CameraProjectionOld._m23 / _CameraProjectionOld._m22;
+    float far = -(near * _CameraProjectionOld._m22) / (1.0f - _CameraProjectionOld._m22 );
+    pos = normalize(input.direction)*(near + (far - near));
+    float ratio = 2240.0f/2016.0f;
+    float2 uv =0.0f;
+    float3 toCam = mul(_WorldToCameraOld, pos);
+    float camPosZ = toCam.z;
+    float height =  camPosZ / _CameraProjectionOld._m11;
+    float width =  (ratio)  * height;
+    uv.x = (toCam.x - width*(2240.0f/2016.0f))/width;
+    uv.y = (toCam.y - height)/height;
+    return (1.0-uv*float2(pheight*ratio/2.043f, pheight/2.0f))-float2(_leftEye?156.0:538.0,_leftEye?-1.3:-0.6);
+}
+
 
 float4 BilinearTextureSample (float2 P)
 {
@@ -577,6 +600,33 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                 // avg += Result[id.xy - float2(1.0,-1.0)]/divisor;
                 // Result[id.xy] = float4(avg, 1.0);
             }
+        }
+
+        if(renderMode == 4){
+            // Result1[id.xy] = float4(result, 1.0);
+
+            float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+            float3 originOld = mul(_CameraToWorldOld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+            float2 reproUV = FindCameraRayVR(CreateRay(originOld,hitPos-originOld));
+            Ray oldCamRay = CreateCameraRay(id.xy);
+            float3 oldHitPos = oldCamRay.origin + oldCamRay.direction;
+            // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
+            float divisor = _AccumulationFrames;
+            // Result[id.xy] = float4((reproUV)/2240.0,0.0, length(hitPos-originOld));
+            // Result[id.xy] = float4(Result1[reproUV].xyz, length(hitPos-originOld));
+            if(reproUV.x < width && reproUV.x>0
+                && reproUV.y < height && reproUV.y>0
+                && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80) && !skyboxS){
+                    
+                Result[id.xy] = float4((Result1[reproUV].xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
+            }else{
+                // if(_SamplesPerPixel<2){
+                //     result *= _SamplesPerPixel/(_SamplesPerPixel+1);
+                //     _SamplesPerPixel++;
+                // }
+                Result[id.xy] = float4(result, length(hitPos-origin));
+            }
+            
         }
 
         if(renderMode >= 10){
