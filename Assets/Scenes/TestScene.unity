@@ -1208,6 +1208,7 @@ MonoBehaviour:
   SpheresMax: 200
   SpherePlacementRadius: 20
   _target: {fileID: 0}
+  denoisedTex: {fileID: 0}
   _converged: {fileID: 0}
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   _currentSample: 0
@@ -1229,6 +1230,7 @@ MonoBehaviour:
   imageBlur: 0
   depth: 0
   RenderPathtracing: 1
+  planerReproject: 0
   renderMode: 0
   frametimer: 0.05
   depthMat: {fileID: 0}
@@ -1823,6 +1825,7 @@ MonoBehaviour:
   SpheresMax: 200
   SpherePlacementRadius: 20
   _target: {fileID: 0}
+  denoisedTex: {fileID: 0}
   _converged: {fileID: 0}
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   _currentSample: 0
@@ -1844,7 +1847,8 @@ MonoBehaviour:
   imageBlur: 0
   depth: 0
   RenderPathtracing: 1
-  renderMode: 0
+  planerReproject: 0
+  renderMode: 2
   frametimer: 0.01
   depthMat: {fileID: 2100000, guid: 3ba5dc023251ebe4d8b20a3289c343f0, type: 2}
 --- !u!114 &1053208581

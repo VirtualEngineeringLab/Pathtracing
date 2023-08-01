@@ -15,6 +15,7 @@ using UnityEngine.Experimental.Rendering;
 using System.Threading;
 using System.Runtime.InteropServices;
 using Unity.Collections;
+using UnityEngine.Rendering.HighDefinition;
 
 public class RayTracingMaster : MonoBehaviour
 {
@@ -34,6 +35,7 @@ public class RayTracingMaster : MonoBehaviour
     private Projector _projector;
     private float _lastFieldOfView;
     public RenderTexture _target;
+    public RenderTexture denoisedTex;
     [SerializeField] private RenderTexture _converged;
     [SerializeField]
     private Material _addMaterial;
@@ -135,7 +137,11 @@ public class RayTracingMaster : MonoBehaviour
 
         _currentSample = 0;
         SetUpScene();
-        StartCoroutine(ASyncRenderer());
+        if(planerReproject){
+            StartCoroutine(ASyncRenderer());
+        }else{
+            RenderPipelineManager.beginCameraRendering += RenderPipelineRender;
+        }
     }
 
     private void OnDisable()
@@ -149,6 +155,20 @@ public class RayTracingMaster : MonoBehaviour
   
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0))
+        {
+            renderMode = RenderMode.Default;
+        }else if (Input.GetKeyDown(KeyCode.Alpha1)|| Input.GetKeyDown(KeyCode.Keypad1))
+        {
+            renderMode = RenderMode.Pause;
+        }else if (Input.GetKeyDown(KeyCode.Alpha2)|| Input.GetKeyDown(KeyCode.Keypad2))
+        {
+            renderMode = RenderMode.Reproj;
+        }else if (Input.GetKeyDown(KeyCode.Alpha3)|| Input.GetKeyDown(KeyCode.Keypad3))
+        {
+            renderMode = RenderMode.BlurAndReproj;
+        }
+
         // this example shows the different camera frustums when using asymmetric projection matrices (like those used by OpenVR).
 
         // var camera = GetComponent<Camera>();
@@ -371,10 +391,10 @@ public class RayTracingMaster : MonoBehaviour
         {
            
             
-            RayTracingShader.SetMatrix("_CameraToWorldOld", _camera.cameraToWorldMatrix);            
+            RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);            
             RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
 
-            RayTracingShader.SetMatrix("_WorldToCamera", oldCTW);
+            RayTracingShader.SetMatrix("_WorldToCameraOld", oldCTW);
             RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
             oldCTW = _camera.worldToCameraMatrix;
             oldPRJ = _camera.projectionMatrix;
@@ -413,6 +433,11 @@ public class RayTracingMaster : MonoBehaviour
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _converged.enableRandomWrite = true;
             _converged.Create();
+
+            denoisedTex = new RenderTexture((int)(RenderWidth/renderScale), (int)(RenderHight / renderScale), 0,
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            denoisedTex.enableRandomWrite = true;
+            denoisedTex.Create();
                             
             _renderTextureMat.mainTexture = _target;  
 
@@ -481,7 +506,9 @@ public class RayTracingMaster : MonoBehaviour
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         Graphics.Blit(source, destination);    
-        return;
+        if(planerReproject){
+            return;
+        }
         //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 2;
         thisCameraRot = _camera.transform.rotation.eulerAngles;
         thisCameraPos = _camera.transform.position;
@@ -535,20 +562,33 @@ public class RayTracingMaster : MonoBehaviour
     private bool RenderDirty = false;
     int divisions = 10;
     int counter = 0;
+    public bool planerReproject = false;
     private void Render(RenderTexture source, RenderTexture destination)
     {
-        // if(counter%10==0){
-        //     SetShaderParameters();
-        //     // Make sure we have a current render target
-        //     InitRenderTexture();
-        // }
+        Graphics.Blit(_target, destination);    
+        if(isRendering){
+            // Graphics.Blit(_target, destination);    
+            return;
+        }
+        
+        isRendering = true;
+        RebuildMeshObjectBuffers();        
+
+        SetShaderParameters();
+        // Make sure we have a current render target
+        InitRenderTexture();
 
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing){
+            ReproPerf.text = "";
+            RenderPerf.text = $"{renderTimer*1000f}";
             // Set the target and dispatch the compute shader
-            RayTracingShader.SetInt("_Counter", counter++%divisions);
+            RayTracingShader.SetInt("renderMode", (int)renderMode);
+            RayTracingShader.SetInt("_Divisions", divisions);
+            RayTracingShader.SetInt("_Counter", counter%divisions);
 
             RayTracingShader.SetTexture(0, "Result", _target);
+            RayTracingShader.SetTexture(0, "Result1", _converged);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
@@ -615,7 +655,58 @@ public class RayTracingMaster : MonoBehaviour
             //      Graphics.Blit(source, _target, _addMaterial);
             // }
             // _renderTextureMat.mainTexture = _target;
-            Graphics.Blit(_target, destination);    
+
+            
+            // if(cmd==null || cmdDenoiser == null){
+            //     cmd = new CommandBuffer();
+            //     cmdDenoiser = new CommandBufferDenoiser();
+            // }
+            // // Initialize the denoising state
+            // result = cmdDenoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
+            // // Assert.AreEqual(Denoiser.State.Success, result);
+
+            // // Create a new denoise request for a color image stored in a Render Texture
+            // cmdDenoiser.DenoiseRequest(cmd, "color", _target);
+
+            // // // Use albedo AOV to improve results
+            // // denoiser.DenoiseRequest(cmd, "albedo", _target);
+
+            // // // Check if the denoiser request is still executing
+            // // while (denoiser.QueryCompletion() != Denoiser.State.Executing)
+            // // {
+            // //    yield return null;
+            // // }
+            // // Create a new denoise request for a color image stored in a Render Texture
+            // var src = ScriptableRenderContext();
+
+            // // Wait until the denoising request is done executing
+            // result = cmdDenoiser.WaitForCompletion(src, cmd);
+            // // Assert.AreEqual(Denoiser.State.Success, result);
+
+            // // Get the results
+            // // var dst = new RenderTexture(colorImage.descriptor);
+            // result = cmdDenoiser.GetResults(cmd, _target);
+            // StartCoroutine(waitForDenoise());
+            
+             // Check if the denoiser request is still executing
+            // if (cmdDenoiser.QueryCompletion() != Denoiser.State.Executing)
+            // {
+            //     // Get the results
+            //     // var dst = new RenderTexture(_target.descriptor);
+            //     result = cmdDenoiser.GetResults(cmd, destination);
+            //     print("success denoising");
+            //     // Assert.AreEqual(Denoiser.State.Success, result);
+            // }
+
+            // Get the results
+            // var dst = new RenderTexture(_target.descriptor);
+            // result = cmdDenoiser.GetResults(cmd, dst);
+            // Graphics.Blit(dst, _target);
+            // Assert.AreEqual(Denoiser.State.Success, result);
+            
+
+            // Graphics.Blit(_target, destination);    
+            isRendering = false;
 
             if(RenderDirty){
                 RenderDirty = false;  
@@ -632,6 +723,83 @@ public class RayTracingMaster : MonoBehaviour
         else
             _currentSample = actualSampleFrames;
     }
+    CommandBuffer cmd;    
+
+    // Create a new denoiser object
+    CommandBufferDenoiser cmdDenoiser = null;
+    Denoiser.State result;
+
+    IEnumerator waitForDenoise(){
+        print(cmdDenoiser.QueryCompletion());
+        while (cmdDenoiser.QueryCompletion() == Denoiser.State.Executing)
+        {
+            yield return null;
+            print(cmdDenoiser.QueryCompletion());
+        }
+        // var dstemp = new RenderTexture(_target.descriptor);
+        result = cmdDenoiser.GetResults(cmd, _target);
+        print("success denoising");
+        isRendering = false;
+    }
+
+    private void RenderPipelineRender(ScriptableRenderContext context, Camera camera){
+        print("rendering");
+        if(isRendering){
+            return;
+        }
+        DelayedFollow.reprojectionUpdate?.Invoke();
+        // _camera.transform.position -= camera.transform.right;
+        isRendering = true;
+        RebuildMeshObjectBuffers();        
+
+        SetShaderParameters();
+        // Make sure we have a current render target
+        InitRenderTexture();
+
+        RenderPathtracingStatic = RenderPathtracing;
+        if(RenderPathtracing){
+            ReproPerf.text = "";
+            RenderPerf.text = $"{renderTimer*1000f}";
+            // Set the target and dispatch the compute shader
+            RayTracingShader.SetInt("renderMode", (int)renderMode);
+            RayTracingShader.SetInt("_Divisions", divisions);
+            RayTracingShader.SetInt("_Counter", counter%divisions);
+
+            RayTracingShader.SetTexture(0, "Result", _target);
+            RayTracingShader.SetTexture(0, "Result1", _converged);
+            int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
+            int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
+            RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
+            print("success rendering");
+        }
+
+        if(cmd==null || cmdDenoiser == null){
+            cmd = new CommandBuffer();
+            cmdDenoiser = new CommandBufferDenoiser();
+            print("initialize denoising");            
+            // result = cmdDenoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
+        }
+        
+        cmd.Clear();
+    
+        result = cmdDenoiser.Init(DenoiserType.Optix, RenderWidth, RenderHight);
+
+        // Create a new denoise request for a color image stored in a Render Texture
+        cmdDenoiser.DenoiseRequest(cmd, "color", _target);
+
+        // Wait until the denoising request is done executing
+        result = cmdDenoiser.WaitForCompletion(context, cmd);
+        // Assert.AreEqual(Denoiser.State.Success, result);
+        print(result);
+        
+        result = cmdDenoiser.GetResults(cmd, _target);
+        print("success denoising");
+        cmdDenoiser?.DisposeDenoiser();
+        
+        isRendering = false;
+    }
+
+    
 
     private bool isRendering = false;
 
@@ -640,8 +808,9 @@ public class RayTracingMaster : MonoBehaviour
     // public int resetnum = 0;
     public enum RenderMode{
         Default = 0,
-        Depth = 1,
-        Reproj = 2
+        Pause = 1,
+        Reproj = 2,
+        BlurAndReproj = 3
     }
     public RenderMode renderMode = RenderMode.Default;
     NativeArray<Vector4> dst;
@@ -653,7 +822,7 @@ public class RayTracingMaster : MonoBehaviour
         //     resetPos = true;
         // }
 
-        if(counter%divisions==0 || depth)
+        // if(counter%divisions==0 || depth)
         {
             DelayedFollow.reprojectionUpdate?.Invoke();
             ReproPerf.text = $"{Time.deltaTime*1000f}";
@@ -674,8 +843,8 @@ public class RayTracingMaster : MonoBehaviour
             // Set the target and dispatch the compute shader
             // AsyncGPUReadback.Request(_target, );
             RayTracingShader.SetInt("renderMode", (int)renderMode);
-            RayTracingShader.SetInt("_Divisions", divisions);
-            RayTracingShader.SetInt("_Counter", counter%divisions);
+            // RayTracingShader.SetInt("_Divisions", divisions);
+            // RayTracingShader.SetInt("_Counter", counter%divisions);
             
 
             RayTracingShader.SetTexture(0, "Result", _target);
@@ -704,7 +873,8 @@ public class RayTracingMaster : MonoBehaviour
         //     // Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
         // }
         
-        if(false && counter%divisions==0 && RenderPathtracing){
+        // if(false && counter%divisions==0 && RenderPathtracing)
+        {
         unsafe{
             Debug.LogError("Denoising");
             Denoiser.State result;

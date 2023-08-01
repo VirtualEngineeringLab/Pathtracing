@@ -113,6 +113,10 @@ public class DelayedFollow : MonoBehaviour
     // Update is called once per frame
     void UpdateReprojectionPlane()
     {
+
+        transform.position = _target.transform.position+_target.transform.forward*0.25f;
+        transform.rotation = _target.transform.rotation;
+        return;
         // if(RayTracingMaster.resetPos){
         //     RayTracingMaster.resetPos = false;
         // }else{
