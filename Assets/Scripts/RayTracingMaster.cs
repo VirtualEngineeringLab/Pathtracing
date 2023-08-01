@@ -155,18 +155,24 @@ public class RayTracingMaster : MonoBehaviour
   
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0))
+        if (Input.GetKeyDown(KeyCode.F1))
         {
             renderMode = RenderMode.Default;
-        }else if (Input.GetKeyDown(KeyCode.Alpha1)|| Input.GetKeyDown(KeyCode.Keypad1))
-        {
-            renderMode = RenderMode.Pause;
-        }else if (Input.GetKeyDown(KeyCode.Alpha2)|| Input.GetKeyDown(KeyCode.Keypad2))
+        }else if (Input.GetKeyDown(KeyCode.F2))
         {
             renderMode = RenderMode.Reproj;
-        }else if (Input.GetKeyDown(KeyCode.Alpha3)|| Input.GetKeyDown(KeyCode.Keypad3))
+        }else if (Input.GetKeyDown(KeyCode.F3))
         {
             renderMode = RenderMode.BlurAndReproj;
+        }else if (Input.GetKeyDown(KeyCode.F10))
+        {
+            renderMode = RenderMode.NewRender;
+        }else if (Input.GetKeyDown(KeyCode.F11))
+        {
+            renderMode = RenderMode.DepthPause;
+        }else if (Input.GetKeyDown(KeyCode.F12))
+        {
+            renderMode = RenderMode.PlanerPause;
         }
 
         // this example shows the different camera frustums when using asymmetric projection matrices (like those used by OpenVR).
@@ -373,7 +379,9 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetBuffer(0, name, buffer);
         }
     }
+    private Matrix4x4 oldIPR;
     private Matrix4x4 oldCTW;
+    private Matrix4x4 oldWTC;
     private Matrix4x4 oldPRJ;
 
     private void SetShaderParameters()
@@ -388,15 +396,18 @@ public class RayTracingMaster : MonoBehaviour
             var pMatrix = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right).inverse;
             RayTracingShader.SetMatrix("_CameraInverseProjection", pMatrix);
         }else
-        {
-           
+        {           
             
             RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);            
             RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
 
-            RayTracingShader.SetMatrix("_WorldToCameraOld", oldCTW);
+            RayTracingShader.SetMatrix("_CameraInverseProjectionOld",oldIPR);
+            RayTracingShader.SetMatrix("_CameraToWorldOld", oldCTW);
+            RayTracingShader.SetMatrix("_WorldToCameraOld", oldWTC);
             RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
-            oldCTW = _camera.worldToCameraMatrix;
+            oldIPR = _camera.projectionMatrix.inverse;
+            oldCTW = _camera.cameraToWorldMatrix;
+            oldWTC = _camera.worldToCameraMatrix;
             oldPRJ = _camera.projectionMatrix;
         }
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
@@ -565,11 +576,11 @@ public class RayTracingMaster : MonoBehaviour
     public bool planerReproject = false;
     private void Render(RenderTexture source, RenderTexture destination)
     {
-        Graphics.Blit(_target, destination);    
-        if(isRendering){
-            // Graphics.Blit(_target, destination);    
-            return;
-        }
+        
+        // if(isRendering){
+        //     // Graphics.Blit(_target, destination);    
+        //     return;
+        // }
         
         isRendering = true;
         RebuildMeshObjectBuffers();        
@@ -586,6 +597,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetInt("renderMode", (int)renderMode);
             RayTracingShader.SetInt("_Divisions", divisions);
             RayTracingShader.SetInt("_Counter", counter%divisions);
+            RayTracingShader.SetInt("_AccumulationFrames", (int)sampleFrames);
 
             RayTracingShader.SetTexture(0, "Result", _target);
             RayTracingShader.SetTexture(0, "Result1", _converged);
@@ -601,10 +613,11 @@ public class RayTracingMaster : MonoBehaviour
             Graphics.Blit(source, destination);          
             return;
         }
+        Graphics.Blit(_target, destination);    
 
-        float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
-            Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
-            Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
+        // float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
+        //     Mathf.Abs(lastCameraRot.y - thisCameraRot.y),
+        //     Mathf.Abs(lastCameraRot.z - thisCameraRot.z));
 
         //actualSampleFrames = (uint)Mathf.RoundToInt((sampleFrames - fastSampleFrames) * rotationSensitivity / Mathf.Max(1, movement)) + fastSampleFrames;
         // movement = Math.Max(movement, Vector3.Distance(lastCameraPos,thisCameraPos)*10);
@@ -624,9 +637,9 @@ public class RayTracingMaster : MonoBehaviour
         //     actualSampleFrames = sampleFrames / 2;
         // }
         // else
-        {
-            actualSampleFrames = sampleFrames;
-        }
+        // {
+        //     actualSampleFrames = sampleFrames;
+        // }
 
         
         // if (temp == null || temp2 == null ||temp.height!=_converged.height || temp.width != _converged.width)
@@ -637,8 +650,8 @@ public class RayTracingMaster : MonoBehaviour
         //     temp2 = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         // }
 
-        if(_renderTextureMat != null){   
-            _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
+        // if(_renderTextureMat != null){   
+        //     _addMaterial.SetFloat("_Sample", depth ? 0 : _currentSample);
 
             // _converged.Release();
             // _converged = new RenderTexture((int)(RenderWidth / renderScale), (int)(RenderHight / renderScale), 0,
@@ -706,22 +719,22 @@ public class RayTracingMaster : MonoBehaviour
             
 
             // Graphics.Blit(_target, destination);    
-            isRendering = false;
+        //     isRendering = false;
 
-            if(RenderDirty){
-                RenderDirty = false;  
-                return;    
-            }
-        }
-        else{
-            Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
-        }
+        //     if(RenderDirty){
+        //         RenderDirty = false;  
+        //         return;    
+        //     }
+        // }
+        // else{
+        //     Graphics.Blit(imageBlur?Blur(_target, 1): _target, destination, shiftMat);
+        // }
 
 
-        if (_currentSample < actualSampleFrames)
-            _currentSample++;
-        else
-            _currentSample = actualSampleFrames;
+        // if (_currentSample < actualSampleFrames)
+        //     _currentSample++;
+        // else
+        //     _currentSample = actualSampleFrames;
     }
     CommandBuffer cmd;    
 
@@ -807,10 +820,12 @@ public class RayTracingMaster : MonoBehaviour
 
     // public int resetnum = 0;
     public enum RenderMode{
-        Default = 0,
-        Pause = 1,
+        Default = 1,
         Reproj = 2,
-        BlurAndReproj = 3
+        BlurAndReproj = 3,
+        NewRender = 10,
+        DepthPause = 11,
+        PlanerPause = 12,
     }
     public RenderMode renderMode = RenderMode.Default;
     NativeArray<Vector4> dst;
