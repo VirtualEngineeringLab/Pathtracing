@@ -34,7 +34,8 @@ public class MoveCamera : MonoBehaviour {
             transform.localRotation = Quaternion.Euler(180,0,0);
         }else{
             transform.localScale = Vector3.one;
-            transform.localRotation = Quaternion.identity;
+            transform.eulerAngles = new Vector3(-rotationY, rotationX , 0);
+
         }
 
         if(move){

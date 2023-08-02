@@ -3,6 +3,8 @@
 	Properties
 	{
 		_MainTex ("Texture", 2D) = "white" {}
+		Result1 ("Texture", 2D) = "white" {}
+		UVtex ("Texture", 2D) = "white" {}
 		_xOffset ("XOffset", float) = 0
 		_yOffset ("YOffset", float) = 0
 		_zOffset ("ZOffset", float) = 0
@@ -40,6 +42,8 @@
 			float _yOffset;
 			float _zOffset;
 			sampler2D _MainTex;
+			sampler2D Result1;
+			sampler2D UVtex;
 			float _Sample;
 
 
@@ -47,8 +51,8 @@
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
-				o.uv.x = 1.0-v.uv.x ;//+ _xOffset
-				o.uv.y = 1.0-v.uv.y ;//+ _yOffset
+				o.uv.x = v.uv.x ;//+ _xOffset
+				o.uv.y = v.uv.y ;//+ _yOffset
 				//o.uv = v.uv;
 
 				//float x1 = 0, x2 = 1, x3 = 1, x4 = 0;
@@ -120,7 +124,11 @@
 			
 			float4 frag (v2f i) : SV_Target
 			{
+				if(tex2D(UVtex, i.uv).x > 0.0 && tex2D(UVtex, i.uv).y > 0.0){
+				return float4(tex2D(Result1, tex2D(UVtex, i.uv).xy).rgb*9.0/10.0+tex2D(_MainTex, i.uv).rgb/10.0, 1.0);
+				}else{
 				return float4(tex2D(_MainTex, i.uv).rgb, 1.0);
+				}
 			}
 			ENDCG
 		}

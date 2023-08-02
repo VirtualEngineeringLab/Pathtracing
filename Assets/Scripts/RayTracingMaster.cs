@@ -448,15 +448,17 @@ public class RayTracingMaster : MonoBehaviour
 
             var pMatrix = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right).inverse;
             RayTracingShader.SetMatrix("_CameraInverseProjection", pMatrix);
-
             RayTracingShader.SetMatrix("_CameraInverseProjectionOld",oldIPR);
             RayTracingShader.SetMatrix("_CameraToWorldOld", oldCTW);
             RayTracingShader.SetMatrix("_WorldToCameraOld", oldWTC);
             RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
-            oldIPR = pMatrix;
-            oldCTW = vMatrix;
-            oldWTC = _camera.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
-            oldPRJ = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
+
+            if((int)renderMode<11){                
+                oldIPR = pMatrix;
+                oldCTW = vMatrix;
+                oldWTC = _camera.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
+                oldPRJ = _camera.GetStereoProjectionMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right);
+            }
         }else
         {           
             
@@ -467,10 +469,14 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrix("_CameraToWorldOld", oldCTW);
             RayTracingShader.SetMatrix("_WorldToCameraOld", oldWTC);
             RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
+
+            if((int)renderMode<11)
+            {  
             oldIPR = _camera.projectionMatrix.inverse;
             oldCTW = _camera.cameraToWorldMatrix;
             oldWTC = _camera.worldToCameraMatrix;
             oldPRJ = _camera.projectionMatrix;
+            }
         }
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
         RayTracingShader.SetFloat("_Seed", Random.value);
@@ -649,6 +655,7 @@ public class RayTracingMaster : MonoBehaviour
         // }
         
         isRendering = true;
+        
         RebuildMeshObjectBuffers();        
 
         SetShaderParameters();
@@ -658,7 +665,7 @@ public class RayTracingMaster : MonoBehaviour
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing && _target != null && RenderWidth>0 && RenderHight>0){
             ReproPerf.text = "";
-            RenderPerf.text = $"{renderTimer*1000f}";
+            RenderPerf.text = $"{Time.deltaTime*1000f}";
             // Set the target and dispatch the compute shader
             RayTracingShader.SetInt("renderMode", (int)renderMode);
             RayTracingShader.SetInt("_Divisions", divisions);
@@ -667,6 +674,7 @@ public class RayTracingMaster : MonoBehaviour
 
             RayTracingShader.SetTexture(0, "Result", _target);
             RayTracingShader.SetTexture(0, "Result1", _converged);
+            // RayTracingShader.SetTexture(0, "UVtex", denoisedTex);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
@@ -683,6 +691,8 @@ public class RayTracingMaster : MonoBehaviour
         //     Graphics.Blit(_target, destination, shiftMat);    
         // }else
         {
+            // shiftMat.SetTexture("UVtex", denoisedTex);
+            // shiftMat.SetTexture("Result1", _converged);
             Graphics.Blit(_target, destination);    
         }
 
@@ -899,7 +909,7 @@ public class RayTracingMaster : MonoBehaviour
         DepthPause = 11,
         PlanerPause = 12,
     }
-    public static RenderMode renderMode = RenderMode.Default;
+    public static RenderMode renderMode = RenderMode.Reproj;
     NativeArray<Vector4> dst;
     Texture2D cpuTexture;
     Denoiser denoiser;
