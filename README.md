@@ -14,7 +14,7 @@ This project was originally based off of David Kuri's work as found here:
 
 https://bitbucket.org/Daerst/gpu-ray-tracing-in-unity/src/Tutorial_Pt3/
 
-https://three-eyed-games.com/2019/03/18/gpu-path-tracing-in-unity-part-3/
+https://web.archive.org/web/20221014140045/https://three-eyed-games.com/2019/03/18/gpu-path-tracing-in-unity-part-3/
 
 Futher work done by William Sokol Erhard initially at Volkswagen and now independently.
 
