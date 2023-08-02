@@ -6,6 +6,17 @@
 
 
 RWTexture2D<float4> output;
+RWTexture2D<float4> Result1;
+
+float4x4 _CameraToWorld;
+float4x4 _CameraToWorldOld;
+float4x4 _CameraInverseProjection;
+float4x4 _CameraInverseProjectionOld;
+
+float4x4 _WorldToCamera;
+float4x4 _WorldToCameraOld;
+float4x4 _CameraProjection;
+float4x4 _CameraProjectionOld;
 
 //scene data
 StructuredBuffer<float4x4> triangle_list;
@@ -202,6 +213,9 @@ bool SceneIntersection(Ray ray, out float3 position, out float3 normal, out RayH
 		}
 	}
 
+	if(!intersected)
+		hit.distance = 1.#INF;
+
 	return ris;
 }
 
@@ -357,6 +371,48 @@ float3 Shade(inout Ray ray, RayHit hit, uint seed)
 }
 
 
+Ray CreateRay(float3 origin, float3 direction)
+{
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    ray.energy = float3(1.0f, 1.0f, 1.0f);
+    return ray;
+}
+
+Ray CreateCameraRay(float2 uv)
+{
+    // Transform the camera origin to world space
+    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    
+    // Invert the perspective projection of the view-space position
+    float3 direction = mul(_CameraInverseProjection, float4(uv, 1.0f, 1.0f)).xyz;
+    // Transform the direction from camera to world space and normalize
+    direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz;
+    direction = normalize(direction);
+
+    return CreateRay(origin, direction);
+}
+
+float2 FindCameraRay(Ray input)
+{   
+    uint pwidth, pheight;
+    Result1.GetDimensions(pwidth, pheight);
+    // float2 dimensions = float2(pwidth, pheight);
+    float near = -_CameraProjectionOld._m23 / _CameraProjectionOld._m22;
+    float far = -(near * _CameraProjectionOld._m22) / (1.0f - _CameraProjectionOld._m22 );
+    float3 pos = normalize(input.direction)*(near + (far - near));
+    float ratio = pwidth / pheight;
+    float2 uv = 0.0f;
+    float3 toCam = mul(_WorldToCameraOld, pos);
+    float camPosZ = toCam.z;
+    float height =  camPosZ / _CameraProjectionOld._m11;
+    float width =  (ratio)  * height;
+    uv.x = (toCam.x - width*(16.0f/9.0f))/width;
+    uv.y = (toCam.y - height)/height;
+    return (0.5f-uv*float2(pheight*ratio/2.0f, pheight/2.0f));
+}
+
 
 
 static const int NUM_BOUNCES = 4;
@@ -366,12 +422,15 @@ void PathTrace_uniform_grid(CS_INPUT input)
 {
 	if (input.DTid.x < screen_size.x && input.DTid.y < screen_size.y)
 	{
+		Result1[input.DTid.xy] = output[input.DTid.xy];
 		//compute view ray
 		float2 uv = float2(input.DTid.xy) / (screen_size.xy - 1);
 		float3 eye_dir = lerp(lerp(worldspace_frustum_corners[0], worldspace_frustum_corners[1], uv.y), lerp(worldspace_frustum_corners[2], worldspace_frustum_corners[3], uv.y), uv.x);
 		eye_dir = normalize(eye_dir);
 
 		Ray ray = MakeRay(camera_position.xyz, eye_dir);
+		// Ray ray2 = CreateCameraRay(input.DTid.xy);
+
 
 		float3 intersection_position;
 		float3 intersection_normal;
@@ -382,36 +441,70 @@ void PathTrace_uniform_grid(CS_INPUT input)
 		//random initial seed using thread id
 		uint seed = wang_hash(input.DTid.x + input.DTid.y * screen_size.x + start_seed);
 		RayHit hit;
-
+		float3 hitPos;
 		for (int bounce = 0; bounce < NUM_BOUNCES; ++bounce)
 		{
-			if (SceneIntersection(ray, intersection_position, intersection_normal, hit))
-			{
+			// if (SceneIntersection(ray, intersection_position, intersection_normal, hit))
+			// {
+				SceneIntersection(ray, intersection_position, intersection_normal, hit);
+
+				if(bounce==0){
+					hitPos = hit.position;
+				}
 				seed = rand_xorshift(seed);
 				
 				L += ray.energy * Shade(ray, hit, seed);
 				//L
 
-			}
-			else
-			{
-				L += SimpleGradient(ray) *  ray.energy;  //float3(1.5, 1.5, 1.5) is the temporary skybox value
+			// }
+			// else
+			// {
+			// 	L += SimpleGradient(ray) *  ray.energy;  //float3(1.5, 1.5, 1.5) is the temporary skybox value
 
-				if (bounce == 0)
-					//L = float3(0, 0, 0);
-				if (!any(ray.energy))
-					break;
-				break;
-			}
+			// 	if (bounce == 0)
+			// 		//L = float3(0, 0, 0);
+			// 	if (!any(ray.energy))
+			// 		break;
+			// 	break;
+			// }
 		
 									
 		}
 
-		float4 ris = output[input.DTid.xy];
-		float num_samples = ris.a;
-		L = 1.0 / (num_samples + 1) * (num_samples * ris.rgb + L);
-		ris = float4(L, num_samples + 1);
+    	uint width, height;
+		Result1.GetDimensions(width, height);
+
+		float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+		float3 originOld = mul(_CameraToWorldOld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+		float2 reproUV = FindCameraRay(CreateRay(originOld,hitPos-originOld));
+		Ray oldCamRay = CreateCameraRay(input.DTid.xy);
+		float3 oldHitPos = oldCamRay.origin + oldCamRay.direction;
+		// float2 reproUV = FindCameraRay(CreateCameraRay(uv));
+		float divisor = 10.0;
+
+		// Result[id.xy] = float4(frac(reproUV),0.0, length(hitPos-originOld));
+		// Result[id.xy] = float4(Result1.Load(reproUV).xyz, length(hitPos-origin));
+		if(reproUV.x < width && reproUV.x>0
+			&& reproUV.y < height && reproUV.y>0
+				&& (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80)){//
+			// UVtex[id.xy] = float4(reproUV/textureSize,0.0,0.0);
+			// Result[id.xy] = float4((Result1[reproUV].xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
+			output[input.DTid.xy] = float4((Result1[reproUV].xyz*(divisor-1))/divisor+L/divisor, length(hitPos-originOld));
+			
+		}else{
+			// if(_SamplesPerPixel<2){
+			//     result *= _SamplesPerPixel/(_SamplesPerPixel+1);
+			//     _SamplesPerPixel++;
+			// }
+			output[input.DTid.xy] = float4(L, length(hitPos-origin));
+		}
+
+		// float4 ris = output[input.DTid.xy];
+		// float num_samples = 10.0;
+		// L = 1.0 / (num_samples + 1) * (num_samples * ris.rgb + L);
+		// ris = float4(L, num_samples + 1);
 		
-		output[input.DTid.xy] = ris;
+		// output[input.DTid.xy] = ris;
+		// output[input.DTid.xy] = float4(L,1.0);
 	}
 }

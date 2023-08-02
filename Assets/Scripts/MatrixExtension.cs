@@ -41,7 +41,7 @@ public static class MatrixExtensions
 
         if (det == 0)
         {
-            throw new System.ArgumentException("Cannot calculate inverse of the matrix since it is singular.");
+            // throw new System.ArgumentException("Cannot calculate inverse of the matrix since it is singular.");
         }
 
         float detInv = 1 / det;
