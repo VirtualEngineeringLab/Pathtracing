@@ -29,6 +29,14 @@ public class MoveCamera : MonoBehaviour {
 
     void Update()
     {        
+        if(RayTracingMaster.xrEnabled){
+            transform.localScale = new Vector3(1, -1, 1);
+            transform.localRotation = Quaternion.Euler(180,0,0);
+        }else{
+            transform.localScale = Vector3.one;
+            transform.localRotation = Quaternion.identity;
+        }
+
         if(move){
             if (Keyboard.current[Key.RightArrow].IsPressed()||Keyboard.current[Key.D].IsPressed())
             {
@@ -55,7 +63,7 @@ public class MoveCamera : MonoBehaviour {
                 transform.position -= t.up * speed * Time.deltaTime;
             }
         }
-        if (Input.GetMouseButton(1))
+        if (Input.GetMouseButton(1) && !RayTracingMaster.xrEnabled)
         {            
             if(deadframe){deadframe=false;return;}
 

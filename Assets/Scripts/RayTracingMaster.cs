@@ -120,7 +120,7 @@ public class RayTracingMaster : MonoBehaviour
             gameObject.SetActive(false);
         }
 
-        transform.GetChild(0).gameObject.SetActive(foveation);
+        // transform.GetChild(0).gameObject.SetActive(foveation);
 
         _transformsToWatch.Add(transform);
         _transformsToWatch.Add(DirectionalLight.transform);
@@ -157,7 +157,7 @@ public class RayTracingMaster : MonoBehaviour
         _vertexBuffer?.Release();
         _indexBuffer?.Release();
     }
-    static bool xrEnabled = false;
+    public static bool xrEnabled = false;
   
     private void Update()
     {
@@ -441,7 +441,7 @@ public class RayTracingMaster : MonoBehaviour
         
         if(_camera.stereoEnabled){
             bool left = _camera.stereoTargetEye == StereoTargetEyeMask.Left;
-            left = !left;
+            // left = !left;
             RayTracingShader.SetBool("_leftEye",left);
             var vMatrix = _camera.GetStereoViewMatrix(left? Camera.StereoscopicEye.Left:Camera.StereoscopicEye.Right).inverse;
             RayTracingShader.SetMatrix("_CameraToWorld", vMatrix);
@@ -679,9 +679,10 @@ public class RayTracingMaster : MonoBehaviour
             Graphics.Blit(source, destination);          
             return;
         }
-        if(xrEnabled){
-            Graphics.Blit(_target, destination, shiftMat);    
-        }else{
+        // if(xrEnabled){
+        //     Graphics.Blit(_target, destination, shiftMat);    
+        // }else
+        {
             Graphics.Blit(_target, destination);    
         }
 
