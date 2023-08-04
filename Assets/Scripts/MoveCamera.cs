@@ -9,8 +9,8 @@ public class MoveCamera : MonoBehaviour {
     public float minY = -45.0f;
     public float maxY = 45.0f;
 
-    public float sensX = 100.0f;
-    public float sensY = 100.0f;
+    public float sensX = 1.0f;
+    public float sensY = 1.0f;
 
     float rotationY = 0.0f;
     float rotationX = 0.0f;
@@ -68,8 +68,8 @@ public class MoveCamera : MonoBehaviour {
         {            
             if(deadframe){deadframe=false;return;}
 
-            rotationX += Input.GetAxis("Mouse X")* sensX * Time.deltaTime;
-            rotationY += Input.GetAxis("Mouse Y")* sensY * Time.deltaTime;
+            rotationX += Input.GetAxis("Mouse X")* sensX;
+            rotationY += Input.GetAxis("Mouse Y")* sensY;
             rotationY = Mathf.Clamp(rotationY, minY, maxY);
             Vector3 cross = Vector3.Cross(t.forward, transform.forward);
             Vector3 crossO = Vector3.Cross(transform.forward, t.forward);

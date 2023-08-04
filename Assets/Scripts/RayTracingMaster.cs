@@ -184,6 +184,9 @@ public class RayTracingMaster : MonoBehaviour
         }else if (Input.GetKeyDown(KeyCode.F4))
         {
             renderMode = RenderMode.StereoReproj;
+        }else if (Input.GetKeyDown(KeyCode.F5))
+        {
+            renderMode = RenderMode.PartialFrameReproj;
         }else if (Input.GetKeyDown(KeyCode.F10))
         {
             renderMode = RenderMode.NewRender;
@@ -669,7 +672,7 @@ public class RayTracingMaster : MonoBehaviour
             // Set the target and dispatch the compute shader
             RayTracingShader.SetInt("renderMode", (int)renderMode);
             RayTracingShader.SetInt("_Divisions", divisions);
-            RayTracingShader.SetInt("_Counter", counter%divisions);
+            RayTracingShader.SetInt("_Counter", counter++%divisions);
             RayTracingShader.SetInt("_AccumulationFrames", (int)sampleFrames);
 
             RayTracingShader.SetTexture(0, "Result", _target);
@@ -909,6 +912,7 @@ public class RayTracingMaster : MonoBehaviour
         Reproj = 2,
         BlurAndReproj = 3,
         StereoReproj = 4,
+        PartialFrameReproj = 5,
         NewRender = 10,
         DepthPause = 11,
         PlanerPause = 12,
@@ -1112,7 +1116,8 @@ public class RayTracingMaster : MonoBehaviour
     }
     public void FramerateToggle(string framerate)
     {
-        divisions = Int32.Parse(framerate);
+        // divisions = Int32.Parse(framerate);
+        Application.targetFrameRate = Int32.Parse(framerate);
         // frametimer = 1f/Int32.Parse(framerate);
     }
     public float frametimer = 0.05f;
