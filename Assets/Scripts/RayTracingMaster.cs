@@ -57,7 +57,7 @@ public class RayTracingMaster : MonoBehaviour
 
     public void RenderScale(float variable)
     {
-        renderScale = variable;
+        gameObject.GetComponent<Camera>().fieldOfView = variable;
     }
     public void SamplesPer(float variable)
     {
@@ -470,7 +470,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrix("_WorldToCameraOld", oldWTC);
             RayTracingShader.SetMatrix("_CameraProjectionOld", oldPRJ);
 
-            if((int)renderMode<11)
+            // if((int)renderMode<11)
             {  
             oldIPR = _camera.projectionMatrix.inverse;
             oldCTW = _camera.cameraToWorldMatrix;

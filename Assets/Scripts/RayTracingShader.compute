@@ -385,7 +385,7 @@ float2 FindCameraRay(Ray input)
 {   
     uint pwidth, pheight;
     Result.GetDimensions(pwidth, pheight);
-    // float2 dimensions = float2(pwidth, pheight);
+    float2 dimensions = float2(pwidth, pheight);
     float near = -_CameraProjectionOld._m23 / _CameraProjectionOld._m22;
     float far = -(near * _CameraProjectionOld._m22) / (1.0f - _CameraProjectionOld._m22 );
     float3 pos = normalize(input.direction)*(near + (far - near));
@@ -395,7 +395,7 @@ float2 FindCameraRay(Ray input)
     float camPosZ = toCam.z;
     float height =  camPosZ / _CameraProjectionOld._m11;
     float width =  (ratio)  * height;
-    uv.x = (toCam.x - width*(16.0f/9.0f))/width;
+    uv.x = (toCam.x - width*(dimensions.x/dimensions.y))/width;
     uv.y = (toCam.y - height)/height;
     return (0.5f-uv*float2(pheight*ratio/2.0f, pheight/2.0f)-float2(-0.01f,0.01f));
 }
@@ -423,7 +423,7 @@ float2 FindCameraRayVR(Ray input)
 }
 
 
-float4 BilinearTextureSample (float2 P)
+float4 BilinearTextureSample (float2 P)//, float distance, float tolerance)
 {
     uint pwidth, pheight;
     Result.GetDimensions(pwidth, pheight);
@@ -456,7 +456,7 @@ int _AccumulationFrames;
 [numthreads(32,32,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    if(renderMode<11)
+    // if(renderMode<11)
     {
         Result1[id.xy] = Result[id.xy];
     }
@@ -564,10 +564,13 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             // Result[id.xy] = float4(Result1.Load(reproUV).xyz, length(hitPos-origin));
             if(reproUV.x < width && reproUV.x>0
                 && reproUV.y < height && reproUV.y>0
-                 && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80) && !skyboxS){//
+                 && (abs(length(hitPos-originOld)-BilinearTextureSample(reproUV).w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80) && !skyboxS){//
                 // UVtex[id.xy] = float4(reproUV/textureSize,0.0,0.0);
                 // Result[id.xy] = float4((Result1[reproUV].xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
+                // Result[id.xy] = float4((BilinearTextureSample(reproUV).xyz), length(hitPos-originOld));
+                
                 Result[id.xy] = float4((BilinearTextureSample(reproUV).xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
+                // Result[id.xy] = BilinearTextureSample(reproUV);
                 
             }else{
                 // if(_SamplesPerPixel<2){
@@ -592,7 +595,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                 && reproUV.y < height && reproUV.y>0
                 && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80) && !skyboxS){              
                 float3 avg = result/2.5;
-                avg += Result1[reproUV]/5.0;
+                avg += BilinearTextureSample(reproUV).xyz/5.0;
                 avg += Result1[reproUV+1.0]/divisor;
                 avg += Result1[reproUV-1.0]/divisor;
                 avg += Result1[reproUV + float2(1.0,-1.0)]/divisor;
@@ -628,7 +631,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             // Result[id.xy] = float4(Result1[reproUV].xyz, length(hitPos-originOld));
             if(reproUV.x < width && reproUV.x>0
                 && reproUV.y < height && reproUV.y>0
-                && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || Result1[reproUV].w>80) && !skyboxS){
+                && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05 || BilinearTextureSample(reproUV).w>80) && !skyboxS){
                     
                 Result[id.xy] = float4((BilinearTextureSample(reproUV).xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
             }else{
@@ -648,7 +651,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
             if(reproUV.x < width && reproUV.x>0
                 && reproUV.y < height && reproUV.y>0
-                && (abs(length(hitPos-originOld)-Result1[reproUV].w)<length(hitPos-originOld)*0.05|| Result1[reproUV].w>80)  && !skyboxS){
+                && (abs(length(hitPos-originOld)-BilinearTextureSample(reproUV).w)<length(hitPos-originOld)*0.05|| BilinearTextureSample(reproUV).w>80)  && !skyboxS){
                 Result[id.xy] = BilinearTextureSample(reproUV);
                 
             }else{
