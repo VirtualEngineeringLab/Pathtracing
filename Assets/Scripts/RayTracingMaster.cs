@@ -188,15 +188,18 @@ public class RayTracingMaster : MonoBehaviour
         }else if (Input.GetKeyDown(KeyCode.F5))
         {
             renderMode = RenderMode.PartialFrameReproj;
+        }else if (Input.GetKeyDown(KeyCode.F6))
+        {
+            renderMode = RenderMode.PartialFrameReprojDepth;
         }else if (Input.GetKeyDown(KeyCode.F10))
         {
             renderMode = RenderMode.NewRender;
         }else if (Input.GetKeyDown(KeyCode.F11))
         {
-            renderMode = RenderMode.DepthPause;
+            renderMode = RenderMode.PlanerPause;
         }else if (Input.GetKeyDown(KeyCode.F12))
         {
-            renderMode = RenderMode.PlanerPause;
+            renderMode = RenderMode.DepthPause;
         }
         
         // this example shows the different camera frustums when using asymmetric projection matrices (like those used by OpenVR).
@@ -457,7 +460,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrixArray("_WorldToCameraOld", oldWTC.ToArray());
             RayTracingShader.SetMatrixArray("_CameraProjectionOld", oldPRJ.ToArray());
 
-            if(renderMode != RenderMode.PartialFrameReproj || counter%divisions!=0){
+            if((renderMode != RenderMode.PartialFrameReproj && renderMode != RenderMode.PartialFrameReprojDepth) || counter%divisions!=0){
                 oldIPR.Clear();
                 oldCTW.Clear();
                 oldWTC.Clear();
@@ -481,7 +484,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrixArray("_WorldToCameraOld", oldWTC.ToArray());
             RayTracingShader.SetMatrixArray("_CameraProjectionOld", oldPRJ.ToArray());
 
-            if(renderMode != RenderMode.PartialFrameReproj || counter%divisions==0){
+            if((renderMode != RenderMode.PartialFrameReproj && renderMode != RenderMode.PartialFrameReprojDepth)  || counter%divisions==0){
                 oldIPR.Clear();
                 oldCTW.Clear();
                 oldWTC.Clear();
@@ -498,7 +501,7 @@ public class RayTracingMaster : MonoBehaviour
         }
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
         RayTracingShader.SetFloat("_Seed", Random.value);
-        RayTracingShader.SetInt("_SamplesPerPixel", samplesPerPixel);
+        RayTracingShader.SetInt("_SamplesPerPixel", (int)renderMode < 10 ? samplesPerPixel : 1);//
         RayTracingShader.SetInt("_Depth", depth? 1 : 0);
         Vector3 l = DirectionalLight.transform.forward;
         RayTracingShader.SetVector("_DirectionalLight", new Vector4(l.x, l.y, l.z, DirectionalLight.intensity));
@@ -682,7 +685,7 @@ public class RayTracingMaster : MonoBehaviour
 
         RenderPathtracingStatic = RenderPathtracing;
         if(RenderPathtracing && _target != null && RenderWidth>0 && RenderHight>0){
-            if(renderMode == RenderMode.PartialFrameReproj ){
+            if(renderMode == RenderMode.PartialFrameReproj || renderMode == RenderMode.PartialFrameReprojDepth ){
                 if(counter%divisions == 0){
                 ReproPerf.text = $"{Time.deltaTime*1000f}";
                 RenderPerf.text = $"{renderTimer*1000f}";
@@ -938,9 +941,10 @@ public class RayTracingMaster : MonoBehaviour
         BlurAndReproj = 3,
         StereoReproj = 4,
         PartialFrameReproj = 5,
-        NewRender = 10,
-        DepthPause = 11,
-        PlanerPause = 12,
+        PartialFrameReprojDepth = 6,
+        NewRender = 10,        
+        PlanerPause = 11,
+        DepthPause = 12,
     }
     public static RenderMode renderMode = RenderMode.Reproj;
   

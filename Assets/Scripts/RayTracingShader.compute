@@ -320,6 +320,16 @@ float SmoothnessToPhongAlpha(float s)
     return pow(1000.0f, s * s);
 }
 
+float3 SkyboxSample(inout Ray ray){
+    // Erase the ray's energy - the sky doesn't reflect anything
+    ray.energy = 0.0f;
+
+    // Sample the skybox and write it
+    float theta = acos(ray.direction.y) / -PI;
+    float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
+    return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz*2.0;
+}
+
 float3 Shade(inout Ray ray, RayHit hit)
 {
     if (hit.distance < 1.#INF)
@@ -357,13 +367,7 @@ float3 Shade(inout Ray ray, RayHit hit)
     }
     else
     {
-        // Erase the ray's energy - the sky doesn't reflect anything
-        ray.energy = 0.0f;
-
-        // Sample the skybox and write it
-        float theta = acos(ray.direction.y) / -PI;
-        float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
-        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz*2.0;
+        return SkyboxSample(ray);
     }
 }
 
@@ -475,7 +479,7 @@ int _AccumulationFrames;
 [numthreads(32,32,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    if(renderMode<11 && renderMode != 5)
+    if(renderMode<11 && (renderMode != 5 && renderMode != 6))
     {
         Result1[id.xy] = Result[id.xy];
     } 
@@ -494,16 +498,27 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     // Result[id.xy] = float4(0.0,(_Divisions-(id.y/stripe)%_Divisions)/10.0,0.0,1.0);
     // return;
 
-    if(renderMode == 5 && (id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1))){
+    if((renderMode == 5 || renderMode == 6) && (id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1))){
         float2 uvr = float2((id.xy)/ float2(width, height) * 2.0f - 1.0f);
         Ray rayr = CreateCameraRay(uvr);        
         float3 hitPosr = rayr.origin + rayr.direction*10.0f;
+        
+        if(renderMode == 6){     
+            RayHit hitr = Trace(rayr);          
+            hitPosr = hitr.position;
+            if(hitr.distance == 1.#INF){
+                Result[id.xy] =  float4(SkyboxSample(rayr),1.0);
+                return;
+            }
+        }
+
         float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-        float3 originOld = mul(_CameraToWorldOld[0], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        float3 originOld = mul(_CameraToWorldOld[ (_Divisions-(id.y/stripe))-1%_Divisions], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
         float2 reproUV = FindCameraRay(CreateRay(originOld,hitPosr-originOld), (_Divisions-(id.y/stripe))-1%_Divisions);//min((_Divisions-(id.y/stripe)-1-_Counter)%_Divisions,_Counter%_Divisions)
         // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
         if(reproUV.x < width && reproUV.x>0
             && reproUV.y < height && reproUV.y>0
+            // && (renderMode == 5 || ((abs(length(hitPosr-originOld)-BilinearTextureSample(reproUV).w)<length(hitPosr-originOld)*0.1 || Result1[reproUV].w>80.0f)))
             ){
 
             Result[id.xy] = BilinearTextureSample(reproUV);
@@ -578,7 +593,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 hitPos = ray.origin + ray.direction*10.0f;
         bool skyboxS = false;
         RayHit hit;
-        if(renderMode != 12){
+        if(renderMode != 11){
             hit = Trace(ray);
             hitPos = hit.position;
             // depth = (hit.distance/128.0)/ _SamplesPerPixel;
@@ -605,7 +620,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Result[id.xy] = float4(result, 1.0);
         
 
-        if(renderMode == 1 || renderMode == 5){
+        if(renderMode == 1 || renderMode == 5 || renderMode == 6){
             float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
             Result[id.xy] = float4(result, length(hitPos-origin));
         }
@@ -615,7 +630,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
             float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
             float3 originOld = mul(_CameraToWorldOld[0], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-            float2 reproUV = FindCameraRay(CreateRay(originOld,hitPos-originOld));
+            float2 reproUV = FindCameraRay(CreateRay(originOld,hitPos-originOld), 0);
+            // float3 originOld = mul(_CameraToWorldOld[renderMode == 5 ? (_Divisions-(id.y/stripe))-1%_Divisions:0], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+            // float2 reproUV = FindCameraRay(CreateRay(originOld,hitPos-originOld), renderMode == 5 ? (_Divisions-(id.y/stripe))-1%_Divisions:0);
             Ray oldCamRay = CreateCameraRay(id.xy);
             float3 oldHitPos = oldCamRay.origin + oldCamRay.direction;
             // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
@@ -766,7 +783,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         
     }
    
-     if(renderMode == 5)
+    if(renderMode == 5 || renderMode == 6)
     {
         Result1[id.xy] = Result[id.xy];
         // Result[id.xy] = float4(0.0,1.0,0.0,1.0);
