@@ -162,6 +162,8 @@ public class RayTracingMaster : MonoBehaviour
   
     private void Update()
     {
+       
+
         if (Input.GetKeyDown(KeyCode.BackQuote) && gameObject != otherEye)
         {
             xrEnabled = !xrEnabled;
@@ -173,6 +175,9 @@ public class RayTracingMaster : MonoBehaviour
             }
             
             otherEye?.SetActive(true);
+        }else if (Input.GetKeyDown(KeyCode.End))
+        {
+            renderMode = RenderMode.Denoise;
         }else if (Input.GetKeyDown(KeyCode.F1))
         {
             renderMode = RenderMode.Default;
@@ -458,7 +463,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrixArray("_CameraInverseProjectionOld",oldIPR.ToArray());
             RayTracingShader.SetMatrixArray("_CameraToWorldOld", oldCTW.ToArray());
             RayTracingShader.SetMatrixArray("_WorldToCameraOld", oldWTC.ToArray());
-            RayTracingShader.SetMatrixArray("_CameraProjectionOld", oldPRJ.ToArray());
+            RayTracingShader.SetMatrixArray("_CameraProjectionOld", oldPRJ.ToArray());           
 
             if((renderMode != RenderMode.PartialFrameReproj && renderMode != RenderMode.PartialFrameReprojDepth) || counter%divisions!=0){
                 oldIPR.Clear();
@@ -484,6 +489,22 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetMatrixArray("_WorldToCameraOld", oldWTC.ToArray());
             RayTracingShader.SetMatrixArray("_CameraProjectionOld", oldPRJ.ToArray());
 
+            // if(renderMode == RenderMode.Denoise){
+            //     if(oldIPR.Count<=3){
+            //         oldIPR.Add(_camera.projectionMatrix.inverse);
+            //         oldCTW.Add(_camera.cameraToWorldMatrix);
+            //         oldWTC.Add(_camera.worldToCameraMatrix);
+            //         oldPRJ.Add(_camera.projectionMatrix);
+            //         if(oldIPR.Count>3){
+            //             oldIPR.RemoveAt(0);
+            //             oldCTW.RemoveAt(0);
+            //             oldWTC.RemoveAt(0);
+            //             oldPRJ.RemoveAt(0);
+            //         }
+            //     }  
+            //     goto SkipToEnd;             
+            // }
+
             if((renderMode != RenderMode.PartialFrameReproj && renderMode != RenderMode.PartialFrameReprojDepth)  || counter%divisions==0){
                 oldIPR.Clear();
                 oldCTW.Clear();
@@ -499,6 +520,7 @@ public class RayTracingMaster : MonoBehaviour
                 oldPRJ.Add(_camera.projectionMatrix);
             }
         }
+        // SkipToEnd:
         RayTracingShader.SetVector("_PixelOffset", new Vector2(Random.value-0.5f, Random.value-0.5f));
         RayTracingShader.SetFloat("_Seed", Random.value);
         RayTracingShader.SetInt("_SamplesPerPixel", (int)renderMode < 10 ? samplesPerPixel : 1);//
@@ -634,6 +656,8 @@ public class RayTracingMaster : MonoBehaviour
     private Material fovMat;
     [SerializeField]
     public Material blur;
+    [SerializeField]
+    public Material denoiser;
 
     [SerializeField]
     public bool foveation = false;
@@ -705,7 +729,8 @@ public class RayTracingMaster : MonoBehaviour
 
             RayTracingShader.SetTexture(0, "Result", _target);
             RayTracingShader.SetTexture(0, "Result1", _converged);
-            // RayTracingShader.SetTexture(0, "UVtex", denoisedTex);
+            // if(renderMode == RenderMode.Denoise)
+                RayTracingShader.SetTexture(0, "Result2", denoisedTex);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
@@ -721,10 +746,13 @@ public class RayTracingMaster : MonoBehaviour
         // if(xrEnabled){
         //     Graphics.Blit(_target, destination, shiftMat);    
         // }else
+        if(imageBlur)
         {
             // shiftMat.SetTexture("UVtex", denoisedTex);
             // shiftMat.SetTexture("Result1", _converged);
-            Graphics.Blit(_target, destination);    
+            Graphics.Blit(_target, destination, denoiser);    
+        }else{
+            Graphics.Blit(_target, destination);
         }
 
         // float movement = Mathf.Max(Mathf.Abs(lastCameraRot.x - thisCameraRot.x),
@@ -936,6 +964,7 @@ public class RayTracingMaster : MonoBehaviour
 
     // public int resetnum = 0;
     public enum RenderMode{
+        Denoise = 0,
         Default = 1,
         Reproj = 2,
         BlurAndReproj = 3,
