@@ -38,6 +38,7 @@ public class RayTracingMaster : MonoBehaviour
     private float _lastFieldOfView;
     public RenderTexture _target;
     public RenderTexture denoisedTex;
+    public RenderTexture normalTex;
     [SerializeField] private RenderTexture _converged;
     [SerializeField]
     private Material _addMaterial;
@@ -162,8 +163,6 @@ public class RayTracingMaster : MonoBehaviour
   
     private void Update()
     {
-       
-
         if (Input.GetKeyDown(KeyCode.BackQuote) && gameObject != otherEye)
         {
             xrEnabled = !xrEnabled;
@@ -196,6 +195,12 @@ public class RayTracingMaster : MonoBehaviour
         }else if (Input.GetKeyDown(KeyCode.F6))
         {
             renderMode = RenderMode.PartialFrameReprojDepth;
+        }else if (Input.GetKeyDown(KeyCode.F7))
+        {
+            renderMode = RenderMode.FullFrameReproj;
+        }else if (Input.GetKeyDown(KeyCode.F8))
+        {
+            renderMode = RenderMode.FullFrameReprojDepth;
         }else if (Input.GetKeyDown(KeyCode.F10))
         {
             renderMode = RenderMode.NewRender;
@@ -505,7 +510,7 @@ public class RayTracingMaster : MonoBehaviour
             //     goto SkipToEnd;             
             // }
 
-            if((renderMode != RenderMode.PartialFrameReproj && renderMode != RenderMode.PartialFrameReprojDepth)  || counter%divisions==0){
+            if(((int)renderMode<5 || (int)renderMode>8) || counter%divisions==0){
                 oldIPR.Clear();
                 oldCTW.Clear();
                 oldWTC.Clear();
@@ -564,6 +569,11 @@ public class RayTracingMaster : MonoBehaviour
                 RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             denoisedTex.enableRandomWrite = true;
             denoisedTex.Create();
+
+            normalTex = new RenderTexture((int)(RenderWidth/renderScale), (int)(RenderHight / renderScale), 0,
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            normalTex.enableRandomWrite = true;
+            normalTex.Create();
                             
             _renderTextureMat.mainTexture = _target;  
 
@@ -731,6 +741,7 @@ public class RayTracingMaster : MonoBehaviour
             RayTracingShader.SetTexture(0, "Result1", _converged);
             // if(renderMode == RenderMode.Denoise)
                 RayTracingShader.SetTexture(0, "Result2", denoisedTex);
+                // RayTracingShader.SetTexture(0, "Result3", normalTex);
             int threadGroupsX = Mathf.CeilToInt(RenderWidth / 32.0f);
             int threadGroupsY = Mathf.CeilToInt(RenderHight / 32.0f);
             RayTracingShader.Dispatch(0, threadGroupsX, threadGroupsY, 1);
@@ -971,11 +982,13 @@ public class RayTracingMaster : MonoBehaviour
         StereoReproj = 4,
         PartialFrameReproj = 5,
         PartialFrameReprojDepth = 6,
+        FullFrameReproj = 7,
+        FullFrameReprojDepth = 8,
         NewRender = 10,        
         PlanerPause = 11,
         DepthPause = 12,
     }
-    public static RenderMode renderMode = RenderMode.Reproj;
+    public static RenderMode renderMode = RenderMode.Denoise;
   
 
     void RenderAsyncSync(){

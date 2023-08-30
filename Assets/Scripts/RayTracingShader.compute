@@ -372,37 +372,23 @@ float3 Shade(inout Ray ray, RayHit hit)
     }
 }
 
-Ray CreateCameraRayOld(float2 uv)
+Ray CreateCameraRayOld(float2 uv, int framesBack)
 {
     // Transform the camera origin to world space
-    float3 origin = mul(_CameraToWorldOld[0], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    float3 origin = mul(_CameraToWorldOld[framesBack], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
     
     // Invert the perspective projection of the view-space position
-    float3 direction = mul(_CameraInverseProjectionOld[0], float4(uv, 1.0f, 1.0f)).xyz;
+    float3 direction = mul(_CameraInverseProjectionOld[framesBack], float4(uv, 1.0f, 1.0f)).xyz;
     // Transform the direction from camera to world space and normalize
-    direction = mul(_CameraToWorldOld[0], float4(direction, 0.0f)).xyz;
+    direction = mul(_CameraToWorldOld[framesBack], float4(direction, 0.0f)).xyz;
     direction = normalize(direction);
 
     return CreateRay(origin, direction);
 }
 
-float2 FindCameraRay(Ray input)
-{   
-    uint pwidth, pheight;
-    Result.GetDimensions(pwidth, pheight);
-    float2 dimensions = float2(pwidth, pheight);
-    float near = -_CameraProjectionOld[0]._m23 / _CameraProjectionOld[0]._m22;
-    float far = -(near * _CameraProjectionOld[0]._m22) / (1.0f - _CameraProjectionOld[0]._m22 );
-    float3 pos = normalize(input.direction)*(near + (far - near));
-    float ratio = pwidth / pheight;
-    float2 uv = 0.0f;
-    float3 toCam = mul(_WorldToCameraOld[0], pos);
-    float camPosZ = toCam.z;
-    float height =  camPosZ / _CameraProjectionOld[0]._m11;
-    float width =  (ratio)  * height;
-    uv.x = (toCam.x - width*(dimensions.x/dimensions.y))/width;
-    uv.y = (toCam.y - height)/height;
-    return (0.5f-uv*float2(pheight*ratio/2.0f, pheight/2.0f)-float2(-0.01f,0.01f));
+Ray CreateCameraRayOld(float2 uv)
+{
+    return CreateCameraRayOld(uv, 0);
 }
 
 float2 FindCameraRay(Ray input, int framesFrom)
@@ -421,7 +407,11 @@ float2 FindCameraRay(Ray input, int framesFrom)
     float width =  (ratio)  * height;
     uv.x = (toCam.x - width*(dimensions.x/dimensions.y))/width;
     uv.y = (toCam.y - height)/height;
-    return (0.5f-uv*float2(pheight*ratio/2.0f, pheight/2.0f)-float2(-0.01f,0.01f));
+    return (0.5f-uv*float2(pheight*ratio/2.0f, pheight/2.0f)-float2(0.00f,0.005f));
+}
+
+float2 FindCameraRay(Ray input){
+    return FindCameraRay(input, 0);
 }
 
 bool _leftEye;
@@ -461,6 +451,10 @@ float4 BilinearTextureSample (float2 P)//, float distance, float tolerance)
     float4 C21 = Result1[pixel + float2( 1.0, 0.0)];
     float4 C12 = Result1[pixel + float2( 0.0, 1.0)];
     float4 C22 = Result1[pixel + float2( 1.0, 1.0)];
+    // float4 C11 = Result1.Load(pixel + float2( 0.0, 0.0));
+    // float4 C21 = Result1.Load(pixel + float2( 1.0, 0.0));
+    // float4 C12 = Result1.Load(pixel + float2( 0.0, 1.0));
+    // float4 C22 = Result1.Load(pixel + float2( 1.0, 1.0));
     float4 x1 = lerp(C11, C21, f.x);
     float4 x2 = lerp(C12, C22, f.x);
     // return float4(lerp(x1, x2, f.y).xyz,Result1[pixel].w);
@@ -476,7 +470,7 @@ float4 BilinearTextureSample (float2 P)//, float distance, float tolerance)
 // feel free to use it
 
 // here, the denoising kernel stride ranges from 1.0 to 4.0
-#define DENOISE_RANGE float2(1, 4)
+#define DENOISE_RANGE float2(1.0, 4.0)
 
 float hash1(float seed) {
     return frac(sin(seed)*43758.5453123);
@@ -567,7 +561,7 @@ float4 denoiser(float2 fragCoord)
     float cum_w = 0.0;
     float cum_fw = 0.0;
     
-    float denoiseStrength = (DENOISE_RANGE.x + (DENOISE_RANGE.y-DENOISE_RANGE.x)*hash1(641.128752*fragCoord.x + 312.321374*fragCoord.y+1.92357812));
+    float denoiseStrength = (DENOISE_RANGE.x + (DENOISE_RANGE.y-DENOISE_RANGE.x)*hash1(641.128752*fragCoord.x + 312.321374*fragCoord.y+1.92357812*_Seed));
     uint pwidth, pheight;
     Result.GetDimensions(pwidth, pheight);
     float2 textureSize = float2(pwidth, pheight);
@@ -657,7 +651,8 @@ float4 TAA(float2 fragCoord)
     float4 lastColor = BilinearTextureSample(uv);
     
     float3 antialiased = lastColor.xyz;
-    float mixRate = min(lastColor.w, 0.5);
+    // float mixRate = min(lastColor.w, 0.5);
+    float mixRate = 0.5;
     
     float2 off = 1.0 / textureSize;
     // float3 in0 = texture(iChannel0, uv).xyz;
@@ -730,7 +725,7 @@ int _AccumulationFrames;
 [numthreads(32,32,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    if(renderMode<11 && (renderMode != 5 && renderMode != 6&& renderMode != 0))
+    if(renderMode<11 && (renderMode < 5 || renderMode > 8) && renderMode != 0)
     {
         Result1[id.xy] = Result[id.xy];
     } 
@@ -753,37 +748,44 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     // Result[id.xy] = float4(0.0,(_Divisions-(id.y/stripe)%_Divisions)/10.0,0.0,1.0);
     // return;
 
-    if((renderMode == 5 || renderMode == 6) && (id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1))){
+    if(((renderMode == 5 || renderMode == 6) && (id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1)))
+    || (renderMode == 7 || renderMode == 8)){
         float2 uvr = float2((id.xy)/ float2(width, height) * 2.0f - 1.0f);
         Ray rayr = CreateCameraRay(uvr);        
         float3 hitPosr = rayr.origin + rayr.direction*10.0f;
         
-        if(renderMode == 6){     
+        if(renderMode % 2 == 0){     
             RayHit hitr = Trace(rayr);          
             hitPosr = hitr.position;
             if(hitr.distance == 1.#INF){
                 Result[id.xy] =  float4(SkyboxSample(rayr),1.0);
-                return;
+                return; 
             }
         }
 
+        int framesBack = (renderMode == 5 || renderMode == 6) ? ((_Divisions-(id.y/stripe))-1%_Divisions) : 0;
+
         float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-        float3 originOld = mul(_CameraToWorldOld[ (_Divisions-(id.y/stripe))-1%_Divisions], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-        float2 reproUV = FindCameraRay(CreateRay(originOld,hitPosr-originOld), (_Divisions-(id.y/stripe))-1%_Divisions);//min((_Divisions-(id.y/stripe)-1-_Counter)%_Divisions,_Counter%_Divisions)
+        float3 originOld = mul(_CameraToWorldOld[framesBack], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        float2 reproUV = FindCameraRay(CreateRay(originOld,hitPosr-originOld), framesBack);//min((_Divisions-(id.y/stripe)-1-_Counter)%_Divisions,_Counter%_Divisions)
         // float2 reproUV = FindCameraRay(CreateCameraRay(uv));
         if(reproUV.x < width && reproUV.x>0
             && reproUV.y < height && reproUV.y>0
             // && (renderMode == 5 || ((abs(length(hitPosr-originOld)-BilinearTextureSample(reproUV).w)<length(hitPosr-originOld)*0.1 || Result1[reproUV].w>80.0f)))
             ){
-
             Result[id.xy] = BilinearTextureSample(reproUV);
             // Result[id.xy] = float4(0.0,1.0,0.0,1.0);
             
         }else{
             Result[id.xy] = float4(0.0,0.0,0.0,1.0);
         }
-        
-        return;
+
+        if(renderMode<=6)
+            return;
+
+        if(_Counter%_Divisions!=0 && (id.y>height-stripe*_Counter || id.y < height-stripe*(_Counter+1))){
+            return;
+        }
     }
 
     // else if (renderMode == 2 ){
@@ -844,19 +846,23 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         // Get a ray for the UVs
         Ray ray = CreateCameraRay(uv);
+
+        if(renderMode == 7 || renderMode == 8){
+            ray = CreateCameraRayOld(uv,(_Counter-1)%_Divisions);            
+        }
+        bool fullFrameReprojRender = (renderMode != 7 && renderMode != 8) || (id.y<=height-stripe*_Counter || id.y >= height-stripe*(_Counter+1));
         
         float3 hitPos = ray.origin + ray.direction*10.0f;
         bool skyboxS = false;
         RayHit hit;
-        if(renderMode != 11){
+        if(renderMode != 11 && fullFrameReprojRender){
             hit = Trace(ray);
             hitPos = hit.position;
             // depth = (hit.distance/128.0)/ _SamplesPerPixel;
             skyboxS = hit.distance == 1.#INF;
         }
 
-
-        if(renderMode < 10){ 
+        if(renderMode < 10 && fullFrameReprojRender){ 
             result += ray.energy * Shade(ray, hit)  / _SamplesPerPixel;           
             for (int i = 1; i < 4; i++)
             {
@@ -898,8 +904,15 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                 // UVtex[id.xy] = float4(reproUV/textureSize,0.0,0.0);
                 // Result[id.xy] = float4((Result1[reproUV].xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
                 // Result[id.xy] = float4((BilinearTextureSample(reproUV).xyz), length(hitPos-originOld));
-                
-                Result2[id.xy] = float4((BilinearTextureSample(reproUV).xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));
+
+                float maximum = floor(id.xy.y/32.0)*32.0+32.0;
+
+                if(reproUV.y < maximum){
+
+                    Result2[id.xy] = float4((BilinearTextureSample(reproUV).xyz*(divisor-1))/divisor+result/divisor, length(hitPos-originOld));         
+                } else{
+                    Result2[id.xy] = float4(result, length(hitPos-origin));
+                }       
                 
                 // Result[id.xy] = BilinearTextureSample(reproUV);
                 
@@ -920,6 +933,18 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         if(renderMode == 1 || renderMode == 5 || renderMode == 6){
             float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
             Result[id.xy] = float4(result, length(hitPos-origin));
+        }
+
+        if(renderMode == 7 || renderMode == 8){    
+            if((id.y<=height-stripe*_Counter || id.y >= height-stripe*(_Counter+1))){
+                float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+                Result2[id.xy] = float4(result, length(hitPos-origin));
+            }
+           
+            if(_Counter%_Divisions==0){
+                Result1[id.xy] = Result2[id.xy];
+                Result[id.xy] = Result2[id.xy];
+            }
         }
 
         if(renderMode == 2){
@@ -1043,7 +1068,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             }
         }
 
-         if(renderMode >= 11){
+        if(renderMode >= 11){
             float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
             float3 originOld = mul(_CameraToWorldOld[0], float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
             float2 reproUV = FindCameraRay(CreateRay(originOld,hitPos-originOld));

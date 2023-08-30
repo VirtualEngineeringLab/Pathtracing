@@ -773,6 +773,7 @@ MonoBehaviour:
   SpherePlacementRadius: 20
   _target: {fileID: 0}
   denoisedTex: {fileID: 0}
+  normalTex: {fileID: 0}
   _converged: {fileID: 0}
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   _currentSample: 0
@@ -1044,6 +1045,7 @@ MonoBehaviour:
   SpherePlacementRadius: 20
   _target: {fileID: 0}
   denoisedTex: {fileID: 0}
+  normalTex: {fileID: 0}
   _converged: {fileID: 0}
   _addMaterial: {fileID: 2100000, guid: 7eeb8939386374340ac7fe08eeb191ad, type: 2}
   _currentSample: 0
